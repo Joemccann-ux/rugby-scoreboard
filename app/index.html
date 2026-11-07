@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rugby Scoreboard</title>
+<style>
+  :root{--bg:#14161a;--panel:#1e2127;--panel2:#262a31;--line:#343944;--text:#e9ecf1;--mute:#8d95a3;--accent:#2f7df6;--good:#22a55b;--warn:#e0a020;--bad:#d64545}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;user-select:none}
+  .win{display:none} body.is-win .win{display:inline} body.is-win .mac{display:none}
+  header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#0d0f12;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0 12px 0 0;letter-spacing:.3px}
+  .tabs button{background:none;border:0;color:var(--mute);font-size:14px;padding:8px 12px;border-radius:6px;cursor:pointer}
+  .tabs button.on{background:var(--panel2);color:var(--text)}
+  .spacer{flex:1}
+  .pill{font-size:12px;padding:4px 10px;border-radius:20px;background:#3a2020;color:#ffb3b3}
+  .pill.ok{background:#173523;color:#9ce6b8}
+  #alerts{position:sticky;top:53px;z-index:4}
+  #alerts div{padding:9px 16px;font-weight:600;border-bottom:1px solid #0006}
+  #alerts .warn{background:#6b4d0e;color:#ffe3a3}
+  #alerts .bad{background:#7a1f1f;color:#ffd0d0;animation:flash 1s steps(1) infinite}
+  @keyframes flash{50%{background:#a52a2a}}
+  button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+  button:hover{border-color:#566070}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--accent);border-color:var(--accent)}
+  button.good{background:var(--good);border-color:var(--good)}
+  button.bad{background:var(--bad);border-color:var(--bad)}
+  button.yellow{background:#c9a400;border-color:#c9a400;color:#111}
+  button.big{font-size:16px;font-weight:700;padding:12px 14px}
+  input,select,textarea{font:inherit;color:var(--text);background:#111317;border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+  textarea{resize:vertical;width:100%;user-select:text}
+  input[type=color]{padding:2px;width:44px;height:32px}
+  input[type=number]{width:70px}
+  label{color:var(--mute);font-size:12px}
+  main{padding:14px 16px}
+  .page{display:none}.page.on{display:block}
+  .grid{display:grid;grid-template-columns:minmax(380px,500px) 1fr;gap:14px;align-items:start}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px}
+  .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--mute);margin:0 0 10px;font-weight:600}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .col{display:flex;flex-direction:column;gap:4px}
+  #previewWrap{position:relative;width:100%;aspect-ratio:400/270;background:#000;border-radius:6px;overflow:hidden}
+  #liveTag{position:absolute;left:8px;top:8px;background:var(--bad);color:#fff;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:3;letter-spacing:1px}
+  #nowPlaying{margin-top:10px;display:flex;align-items:center;gap:10px}
+  #nowPlaying .what{flex:1;color:var(--mute)}
+  #nowPlaying .what b{color:var(--text)}
+  #progress{height:4px;background:#333;border-radius:2px;overflow:hidden;margin-top:6px}
+  #progress div{height:100%;width:0;background:var(--accent)}
+  .teams{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .team{background:var(--panel2);border-radius:10px;padding:10px;border-top:6px solid #555}
+  .team .score{font-size:56px;font-weight:800;text-align:center;line-height:1;margin:6px 0 10px;font-variant-numeric:tabular-nums}
+  .team select{width:100%}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .btns button{padding:10px 6px;font-weight:600}
+  .btns .try{grid-column:span 2;font-size:17px;padding:14px;background:#244a2f;border-color:#2f6a40}
+  .btns .small{font-weight:500;color:var(--mute)}
+  .btns .wide{grid-column:span 2}
+  .bins{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;min-height:30px}
+  .chip{display:flex;align-items:center;gap:6px;background:#3b3410;border:1px solid #6b5b10;border-radius:6px;padding:3px 4px 3px 8px;font-weight:700;font-variant-numeric:tabular-nums}
+  .chip i{display:inline-block;width:9px;height:12px;background:#ffd400;border-radius:1px}
+  .chip button{padding:2px 7px;font-size:12px}
+  kbd{font:11px ui-monospace,Menlo,monospace;background:#0d0f12;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--mute)}
+  .btns kbd{margin-left:4px}
+  #clockBig{font-size:44px;font-weight:800;font-variant-numeric:tabular-nums;min-width:150px}
+  #clockBig.alert,.clockBigE.alert{color:#ff6b6b;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:.35}}
+  .lib{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto}
+  .item{display:flex;align-items:center;gap:8px;background:var(--panel2);border-radius:8px;padding:6px 8px}
+  .item .thumb{width:64px;height:40px;object-fit:contain;background:#000;border-radius:4px;flex:none}
+  .item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item button{padding:6px 10px}
+  .item.playing{outline:2px solid var(--accent)}
+  .teamEdit{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;background:var(--panel2);border-radius:8px;padding:10px;margin-bottom:8px}
+  .teamEdit .logo{width:70px;height:70px;background:#000 center/contain no-repeat;border-radius:6px;border:1px solid var(--line)}
+  .teamEdit .fields{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  .hint{color:var(--mute);font-size:12px}
+  table.keys{border-collapse:collapse;width:100%}
+  table.keys td{padding:4px 8px;border-bottom:1px solid var(--line)}
+  #toast{position:fixed;right:16px;bottom:16px;background:#000c;border:1px solid var(--line);padding:10px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10}
+  #toast.on{opacity:1}
+  .sponsorGrid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .sp{position:relative;width:110px;height:74px;background:#000 center/contain no-repeat;border:1px solid var(--line);border-radius:6px}
+  .sp button{position:absolute;top:2px;padding:1px 6px;font-size:11px}
+  .sp .x{right:2px}.sp .l{left:2px}
+  .app-only{display:none} body.is-app .app-only{display:block} body.is-app .browser-only{display:none}
+  body.easy .tabs{display:none}
+  .easyGrid{display:grid;grid-template-columns:minmax(380px,520px) 1fr;gap:14px;align-items:start}
+  .ebig{font-size:20px;font-weight:800;padding:16px 20px;border-radius:12px}
+  .eteam .score{font-size:80px}
+  .eteam .btns button{font-size:17px;padding:16px 6px}
+  .eteam .btns .try{font-size:30px;padding:24px;background:#2a7a3f;border-color:#3a9a52}
+  .estage{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+  .estage button{font-size:16px;font-weight:800;padding:16px 4px}
+  .estage button.on{background:var(--accent);border-color:var(--accent)}
+  .evids{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .evids button{min-height:60px;font-weight:700;overflow:hidden;text-overflow:ellipsis}
+  .evids button.on{outline:3px solid var(--accent)}
+  .clockBigE{font-size:56px;font-weight:800;font-variant-numeric:tabular-nums;min-width:180px}
+  #btnView{background:#3b2f6b;border-color:#5a49a3}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏉 Rugby Scoreboard</h1>
+  <div class="tabs">
+    <button data-tab="match" class="on">Match</button>
+    <button data-tab="setup">Teams &amp; graphics</button>
+    <button data-tab="display">Screen setup</button>
+    <button data-tab="keys">Keys</button>
+  </div>
+  <button id="btnView">Easy view</button>
+  <div class="spacer"></div>
+  <span id="outStatus" class="pill">Scoreboard window: not open</span>
+  <button class="primary" id="btnOpenOut">Open scoreboard window</button>
+</header>
+<div id="alerts"></div>
+
+<main>
+<!-- ================= MATCH ================= -->
+<section class="page on" id="page-match">
+  <div class="panel row">
+    <b style="margin-right:6px">Match setup</b>
+    <select id="selPreset" style="min-width:200px"></select>
+    <button id="btnLoadPreset">Load</button>
+    <button id="btnSavePreset">Save current as…</button>
+    <button id="btnDelPreset">Delete</button>
+    <span class="hint">Saves the two teams, kick-off time, sponsor setting and which videos are in the reel.</span>
+    <div class="spacer"></div>
+    <button id="btnResetMatch">New match (reset scores)</button>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <h2>On the scoreboard now</h2>
+        <div id="holderFull"><div id="previewBlock">
+        <div id="previewWrap"><span id="liveTag">LIVE</span></div>
+        <div id="nowPlaying">
+          <div class="what" id="npText">Showing: <b>Scoreboard</b></div>
+          <button class="bad big" id="btnBack">Back to scores <kbd>Esc</kbd></button>
+        </div>
+        <div id="progress"><div></div></div>
+        </div></div>
+      </div>
+
+      <div class="panel">
+        <h2>Clock</h2>
+        <div class="row">
+          <div id="clockBig" data-clock>00:00</div>
+          <button class="good big" id="btnClock" data-act="clock" data-kbd style="min-width:120px">Start <kbd>Space</kbd></button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <select id="selStatus">
+            <option value="pre">Pre-match</option>
+            <option value="h1">1st half</option>
+            <option value="ht">Half time</option>
+            <option value="h2">2nd half</option>
+            <option value="ft">Full time</option>
+          </select>
+          <button id="btnClock0">Set 0:00</button>
+          <button id="btnClock40">Set 40:00</button>
+          <input id="inpTime" placeholder="mm:ss" style="width:70px"><button id="btnSetTime">Set</button>
+        </div>
+        <div class="row" style="margin-top:10px;gap:14px">
+          <div class="col"><label>Kick-off time</label><input type="time" id="setKickoff"></div>
+          <div class="col"><label>Half length (min)</label><input type="number" id="setHalfLen" min="5" max="60"></div>
+          <div class="col"><label>Sin bin (min)</label><input type="number" id="setBinMins" min="1" max="30"></div>
+        </div>
+        <div class="row" style="margin-top:8px;gap:14px">
+          <label><input type="checkbox" id="chkShowClock"> Show clock on scoreboard</label>
+          <label><input type="checkbox" id="chkBeep"> Beep at end of each half</label>
+        </div>
+        <p class="hint" style="margin-bottom:0">Before kick-off (Pre-match), the board counts down to the kick-off time for the last hour.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Messages</h2>
+        <textarea id="msgText" rows="2" placeholder="e.g. Raffle draw at half time"></textarea>
+        <div class="row" style="margin-top:6px">
+          <button class="primary" id="btnMsgShow">Show on scoreboard</button>
+          <button id="btnMsgSave">Save for later</button>
+          <span class="hint">Press Enter for a new line.</span>
+        </div>
+        <div class="lib" id="msgList" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Score</h2>
+        <div class="teams">
+          <div class="team" id="card-home" data-card="home">
+            <select id="selHome" class="teamSel" data-team="home"></select>
+            <div class="score" id="scoreHome" data-score="home">0</div>
+            <div class="btns">
+              <button class="try" data-side="home" data-pts="5" data-lbl="Try">TRY +5 <kbd>Q</kbd><kbd>7</kbd></button>
+              <button data-side="home" data-pts="2" data-lbl="Conversion">Conversion +2 <kbd>W</kbd><kbd>8</kbd></button>
+              <button data-side="home" data-pts="3" data-lbl="Penalty">Penalty +3 <kbd>E</kbd><kbd>9</kbd></button>
+              <button data-side="home" data-pts="3" data-lbl="Drop goal">Drop goal +3 <kbd>R</kbd><kbd>1</kbd></button>
+              <button data-side="home" data-pts="7" data-lbl="Penalty try">Penalty try +7</button>
+              <button class="small" data-side="home" data-pts="1" data-lbl="+1">+1</button>
+              <button class="small" data-side="home" data-pts="-1" data-lbl="−1">−1</button>
+              <button class="yellow" data-bin="home">Sin bin <kbd>T</kbd><kbd>/</kbd></button>
+              <button class="small" data-anim="home">▶ Try animation</button>
+            </div>
+            <div class="bins" id="bins-home" data-bins="home"></div>
+          </div>
+          <div class="team" id="card-away" data-card="away">
+            <select id="selAway" class="teamSel" data-team="away"></select>
+            <div class="score" id="scoreAway" data-score="away">0</div>
+            <div class="btns">
+              <button class="try" data-side="away" data-pts="5" data-lbl="Try">TRY +5 <kbd>U</kbd><kbd>4</kbd></button>
+              <button data-side="away" data-pts="2" data-lbl="Conversion">Conversion +2 <kbd>I</kbd><kbd>5</kbd></button>
+              <button data-side="away" data-pts="3" data-lbl="Penalty">Penalty +3 <kbd>O</kbd><kbd>6</kbd></button>
+              <button data-side="away" data-pts="3" data-lbl="Drop goal">Drop goal +3 <kbd>P</kbd><kbd>3</kbd></button>
+              <button data-side="away" data-pts="7" data-lbl="Penalty try">Penalty try +7</button>
+              <button class="small" data-side="away" data-pts="1" data-lbl="+1">+1</button>
+              <button class="small" data-side="away" data-pts="-1" data-lbl="−1">−1</button>
+              <button class="yellow" data-bin="away">Sin bin <kbd>Y</kbd><kbd>*</kbd></button>
+              <button class="small" data-anim="away">▶ Try animation</button>
+            </div>
+            <div class="bins" id="bins-away" data-bins="away"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="btnUndo" data-act="undo">↶ Undo last score <kbd>Z</kbd><kbd>2</kbd></button>
+          <span class="hint" id="lastAction" data-last></span>
+          <div class="spacer"></div>
+          <label><input type="checkbox" id="chkAutoAnim"> Play try animation when TRY pressed</label>
+          <label><input type="checkbox" id="chkFlash"> Flash score when it changes</label>
+          <label><input type="checkbox" id="chkSponsors"> Rotate sponsor logos under clock</label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Videos &amp; graphics</h2>
+        <div class="row" style="margin-bottom:8px">
+          <button id="btnAddMedia">+ Add videos / images</button>
+          <input type="file" id="fileMedia" accept="video/*,image/*" multiple hidden>
+          <label><input type="checkbox" id="chkLoop"> Loop when shown</label>
+          <span class="hint"><kbd>F1</kbd>–<kbd>F9</kbd> show items 1–9</span>
+        </div>
+        <div class="lib" id="mediaList"></div>
+        <div class="row" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+          <button class="primary" id="btnReel">▶ Play reel <kbd>pad +</kbd></button>
+          <div class="col"><label>Scores shown between (sec)</label><input type="number" id="setReelGap" min="0" max="300"></div>
+          <div class="col"><label>Graphics shown for (sec)</label><input type="number" id="setReelImg" min="2" max="120"></div>
+          <label><input type="checkbox" id="chkAutoReel"> Start reel automatically at half time</label>
+        </div>
+        <p class="hint" style="margin-bottom:0">The reel plays every item ticked "In reel" in order, going back to the scores in between, until you press Back to scores.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================= EASY VIEW ================= -->
+<section class="page" id="page-easy">
+  <div class="easyGrid">
+    <div>
+      <div class="panel"><h2>On the scoreboard now</h2><div id="holderEasy"></div></div>
+      <div class="panel">
+        <h2>Match clock</h2>
+        <div class="row"><div class="clockBigE" data-clock>00:00</div><button class="good ebig" data-act="clock">Start clock</button></div>
+        <div class="estage">
+          <button data-stage="kick">▶ Kick off</button>
+          <button data-stage="ht">Half time</button>
+          <button data-stage="h2">▶ 2nd half</button>
+          <button data-stage="ft">Full time</button>
+        </div>
+        <p class="hint" style="margin-bottom:0">"Kick off" and "2nd half" start the clock for you. Use Stop/Start for injuries and stoppages.</p>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="teams">
+          <div class="team eteam" data-card="home">
+            <select class="teamSel" data-team="home"></select>
+            <div class="score" data-score="home">0</div>
+            <div class="btns">
+              <button class="try" data-side="home" data-pts="5" data-lbl="Try">TRY +5</button>
+              <button data-side="home" data-pts="2" data-lbl="Conversion">Conversion +2</button>
+              <button data-side="home" data-pts="3" data-lbl="Penalty">Penalty +3</button>
+              <button data-side="home" data-pts="3" data-lbl="Drop goal">Drop goal +3</button>
+              <button class="yellow" data-bin="home">Sin bin</button>
+            </div>
+            <div class="bins" data-bins="home"></div>
+          </div>
+          <div class="team eteam" data-card="away">
+            <select class="teamSel" data-team="away"></select>
+            <div class="score" data-score="away">0</div>
+            <div class="btns">
+              <button class="try" data-side="away" data-pts="5" data-lbl="Try">TRY +5</button>
+              <button data-side="away" data-pts="2" data-lbl="Conversion">Conversion +2</button>
+              <button data-side="away" data-pts="3" data-lbl="Penalty">Penalty +3</button>
+              <button data-side="away" data-pts="3" data-lbl="Drop goal">Drop goal +3</button>
+              <button class="yellow" data-bin="away">Sin bin</button>
+            </div>
+            <div class="bins" data-bins="away"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="ebig" data-act="undo">↶ Undo last score</button>
+          <span class="hint" data-last></span>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Videos &amp; graphics</h2>
+        <div class="evids" id="easyVids"></div>
+        <h2 style="margin-top:14px">Messages</h2>
+        <div class="evids" id="easyMsgs"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TEAMS & GRAPHICS ================= -->
+<section class="page" id="page-setup">
+  <div class="panel">
+    <h2>Teams</h2>
+    <p class="hint" style="margin-top:0">Add every team you play once. Each keeps its own name, colours, logo and try animation. Pick them on the Match tab.</p>
+    <div id="teamList"></div>
+    <div class="row">
+      <button class="primary" id="btnAddTeam">+ Add team</button>
+      <span class="app-only" style="display:none" id="clubAddRow">or add from the club list:
+        <select id="selClubAdd"></select> <button id="btnClubAdd">Add</button></span>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Sponsor logos (rotate under the clock)</h2>
+    <div class="sponsorGrid" id="sponsorGrid"></div>
+    <div class="row">
+      <button id="btnAddSponsor">+ Add sponsor logos</button>
+      <input type="file" id="fileSponsor" accept="image/*" multiple hidden>
+      <div class="col"><label>Change every (sec)</label><input type="number" id="setSponsorSecs" min="3" max="120"></div>
+      <span class="hint">PNGs with transparent backgrounds look best. They hide while a sin bin timer is showing.</span>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Scoreboard look</h2>
+    <div class="row" style="gap:18px;align-items:flex-end">
+      <div class="col"><label>Background colour</label><input type="color" id="setBg"></div>
+      <div class="col"><label>Background image (optional)</label>
+        <div class="row"><button id="btnBgImg">Choose image…</button><button id="btnBgClear">Remove</button></div>
+        <input type="file" id="fileBg" accept="image/*" hidden></div>
+      <div class="col"><label>Font</label>
+        <select id="setFont">
+          <option>Arial Black</option><option>Helvetica Neue</option><option>Segoe UI Black</option><option>Bahnschrift</option><option>Impact</option>
+          <option>Futura</option><option>Avenir Next</option><option>DIN Alternate</option><option>Menlo</option>
+        </select></div>
+      <div class="col"><label>Score colour</label><input type="color" id="setScoreCol"></div>
+      <div class="col"><label>Clock colour</label><input type="color" id="setClockCol"></div>
+      <div class="col"><label>Message colour</label><input type="color" id="setMsgCol"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SCREEN SETUP ================= -->
+<section class="page" id="page-display">
+  <div class="panel app-only">
+    <h2>Scoreboard connection</h2>
+    <div class="row" style="gap:14px;align-items:flex-end">
+      <div class="col"><label>Scoreboard display</label><select id="setDisplay" style="min-width:280px"></select></div>
+      <button id="btnPractice">Open practice window on this laptop</button>
+      <button id="btnSendBoard">Send to scoreboard</button>
+    </div>
+    <p class="hint">On "Automatic", the app uses the first screen that isn't your laptop and takes it over full screen as soon as it's plugged in. It only does this while the app is open – close the app and your screens go back to normal.</p>
+    <label><input type="checkbox" id="setGlobalKeys"> Number pad works even when Rugby Scoreboard isn't the front window</label>
+    <p class="hint">Handy if you're doing other things on the laptop. While it's on, the number pad won't type numbers in other programs.</p>
+  </div>
+  <div class="panel browser-only">
+    <h2>Getting the picture onto the scoreboard</h2>
+    <ol class="hint" style="font-size:13px;line-height:1.6;color:var(--text)">
+      <li><span class="mac">On the Mac: <b>System Settings → Displays</b>. Make sure the scoreboard output is <b>extended</b> (not mirrored), and make your MacBook the <b>main display</b>.</span><span class="win">On Windows: press <b>Windows key + P</b> and choose <b>Extend</b>. Then in <b>Settings → System → Display</b>, click your laptop screen and tick <b>Make this my main display</b>.</span></li>
+      <li>Click <b>Open scoreboard window</b> (top right), then drag that window onto the scoreboard screen.</li>
+      <li>Double-click inside it to make it full screen. (Press Esc in that window to leave full screen.)</li>
+      <li>Turn on <b>Test pattern</b> below. You should see a red border right round the edge of the LED screen. If it's cut off or shifted, adjust the position and size below.</li>
+    </ol>
+    <p class="hint">Keep computer awake: <b id="wakeStatus">checking…</b> &nbsp;·&nbsp; A red warning appears at the top if the scoreboard window ends up back on your laptop screen (e.g. the HDMI cable comes out).</p>
+  </div>
+  <div class="panel">
+    <h2>Position &amp; size (in screen pixels)</h2>
+    <div class="row" style="gap:18px;align-items:flex-end">
+      <div class="col"><label>Width</label><input type="number" id="setW"></div>
+      <div class="col"><label>Height</label><input type="number" id="setH"></div>
+      <div class="col"><label>From left (X)</label><input type="number" id="setX"></div>
+      <div class="col"><label>From top (Y)</label><input type="number" id="setY"></div>
+      <label><input type="checkbox" id="setTest"> Test pattern</label>
+    </div>
+    <p class="hint">Default is 400 × 270 in the top-left corner, which matches a pixel-mapped LED controller (it only shows that corner of the computer's picture).</p>
+  </div>
+  <div class="panel">
+    <h2>Monitor copy</h2>
+    <label><input type="checkbox" id="setMirror"> Show a large copy of the scoreboard on the rest of the picture</label>
+    <p class="hint">The LED screen only shows the top-left corner, so the rest of the picture is free. If you feed your monitor from an HDMI splitter, this gives you a big, easy-to-read view of exactly what's on the board. Turn it off if anything stray appears on the LED.</p>
+  </div>
+</section>
+
+<!-- ================= KEYS ================= -->
+<section class="page" id="page-keys">
+  <div class="panel" style="max-width:720px">
+    <h2>Keyboard, number pad &amp; Stream Deck</h2>
+    <p class="hint" style="margin-top:0">Keys work while the control window is the front window. A USB number pad or Stream Deck can be set to send these keys.</p>
+    <table class="keys">
+      <tr><td></td><td><b>Home</b></td><td><b>Away</b></td></tr>
+      <tr><td>Try +5 (and animation)</td><td><kbd>Q</kbd> or pad <kbd>7</kbd></td><td><kbd>U</kbd> or pad <kbd>4</kbd></td></tr>
+      <tr><td>Conversion +2</td><td><kbd>W</kbd> or pad <kbd>8</kbd></td><td><kbd>I</kbd> or pad <kbd>5</kbd></td></tr>
+      <tr><td>Penalty +3</td><td><kbd>E</kbd> or pad <kbd>9</kbd></td><td><kbd>O</kbd> or pad <kbd>6</kbd></td></tr>
+      <tr><td>Drop goal +3</td><td><kbd>R</kbd> or pad <kbd>1</kbd></td><td><kbd>P</kbd> or pad <kbd>3</kbd></td></tr>
+      <tr><td>Sin bin</td><td><kbd>T</kbd> or pad <kbd>/</kbd></td><td><kbd>Y</kbd> or pad <kbd>*</kbd></td></tr>
+      <tr><td>Undo last score</td><td colspan="2"><kbd>Z</kbd> or pad <kbd>2</kbd></td></tr>
+      <tr><td>Start / stop clock</td><td colspan="2"><kbd>Space</kbd> or pad <kbd>0</kbd></td></tr>
+      <tr><td>Back to scores (stop video / message / reel)</td><td colspan="2"><kbd>Esc</kbd> or pad <kbd>.</kbd></td></tr>
+      <tr><td>Play / stop the reel</td><td colspan="2">pad <kbd>+</kbd></td></tr>
+      <tr><td>Show video/graphic 1–9</td><td colspan="2"><kbd>F1</kbd>–<kbd>F9</kbd> (<span class="mac">on a Mac keyboard hold <kbd>fn</kbd></span><span class="win">on many laptops hold <kbd>Fn</kbd></span>)</td></tr>
+    </table>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const API = window.sbApi || null;   // present when running as the desktop app
+let clubs = [], practicing = false;
+/* =====================================================================
+   STAGE – the scoreboard picture, drawn in a W×H (default 400×270)
+   coordinate space and scaled wherever it is shown.
+   ===================================================================== */
+const STAGE_CSS = `
+.sb-stage{position:absolute;left:0;top:0;overflow:hidden;transform-origin:0 0;background:#000;color:#fff}
+.sb-stage *{box-sizing:border-box}
+.sb-bg{position:absolute;inset:0;background-size:cover;background-position:center}
+.sb-logo{position:absolute;top:2%;height:45%;width:31%;display:flex;align-items:center;justify-content:center}
+.sb-logo.home{left:2%}.sb-logo.away{right:2%}
+.sb-logo img{max-width:100%;max-height:100%;object-fit:contain}
+.sb-mid{position:absolute;left:33%;right:33%;top:8%;height:36%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.sb-clock{font-weight:900;font-variant-numeric:tabular-nums;line-height:1.05;white-space:nowrap}
+.sb-half{font-weight:900;opacity:.85;letter-spacing:.04em;margin:4% 0;white-space:nowrap}
+.sb-col{position:absolute;top:48%;bottom:1%;width:35%;text-align:center}
+.sb-col.home{left:0}.sb-col.away{right:0}
+.sb-name{position:absolute;left:0;right:0;top:0;height:26%;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;font-weight:900;text-transform:uppercase}
+.sb-score{position:absolute;left:0;right:0;top:26%;bottom:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-variant-numeric:tabular-nums;line-height:1}
+.sb-score.pop{animation:sbpop .7s ease-out 3}
+@keyframes sbpop{0%{transform:scale(1);filter:brightness(1)}20%{transform:scale(1.2);filter:brightness(1.9)}100%{transform:scale(1);filter:brightness(1)}}
+.sb-centre{position:absolute;left:36%;right:36%;top:51%;bottom:4%}
+.sb-spons{position:absolute;inset:0}
+.sb-spons img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .8s}
+.sb-spons img.on{opacity:1}
+.sb-bins{position:absolute;inset:0;display:none;justify-content:space-between}
+.sb-bincol{display:flex;flex-direction:column;align-items:center;justify-content:center;width:49%}
+.sb-bin{display:flex;flex-direction:column;align-items:center;margin:3% 0}
+.sb-card{background:#ffd400;border-radius:1px;margin-bottom:6%}
+.sb-bintime{font-weight:900;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1}
+.sb-bin.done .sb-bintime{animation:sbblink .5s steps(1) infinite;color:#ff5050}
+@keyframes sbblink{50%{opacity:0}}
+.sb-over{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;font-weight:900;line-height:1.12;padding:2%;white-space:pre}
+.sb-media{position:absolute;inset:0;display:none;background:transparent}
+.sb-media video,.sb-media img{width:100%;height:100%;object-fit:contain;display:block}
+.sb-test{position:absolute;inset:0;display:none;border:1px solid #f00;
+  background-image:linear-gradient(#0f04 1px,transparent 1px),linear-gradient(90deg,#0f04 1px,transparent 1px);background-size:50px 50px}
+.sb-test span{position:absolute;font:bold 14px Arial;color:#ff0;padding:3px}
+`;
+
+class Stage {
+  constructor(container, opts){
+    this.doc = container.ownerDocument;
+    this.audible = !!opts.audible;
+    const d = this.doc;
+    if(!d.getElementById('sb-css')){ const s=d.createElement('style'); s.id='sb-css'; s.textContent=STAGE_CSS; d.head.appendChild(s); }
+    const el = d.createElement('div'); el.className='sb-stage';
+    el.innerHTML = `
+      <div class="sb-bg"></div>
+      <div class="sb-logo home"><img alt=""></div><div class="sb-logo away"><img alt=""></div>
+      <div class="sb-mid"><div class="sb-half"></div><div class="sb-clock">00:00</div></div>
+      ${['home','away'].map(s=>`<div class="sb-col ${s}"><div class="sb-name"></div><div class="sb-score">0</div></div>`).join('')}
+      <div class="sb-centre"><div class="sb-spons"><img alt=""><img alt=""></div><div class="sb-bins"><div class="sb-bincol home"></div><div class="sb-bincol away"></div></div></div>
+      <div class="sb-over"></div>
+      <div class="sb-media"></div>
+      <div class="sb-test"><span style="left:0;top:0">TOP LEFT</span><span style="right:0;bottom:0" class="sz"></span></div>`;
+    container.appendChild(el);
+    this.el = el;
+    const q = s => el.querySelector(s);
+    this.bg=q('.sb-bg'); this.mid=q('.sb-mid'); this.half=q('.sb-half'); this.clock=q('.sb-clock');
+    this.media=q('.sb-media'); this.over=q('.sb-over'); this.test=q('.sb-test');
+    this.spons=q('.sb-spons'); this.sponsImgs=[...this.spons.querySelectorAll('img')]; this.sponsIdx=-1; this.sponsFront=0;
+    this.binsBox=q('.sb-bins'); this.binCols={home:q('.sb-bincol.home'),away:q('.sb-bincol.away')}; this.binsSig='';
+    this.sides={};
+    ['home','away'].forEach(s=>{ const c=q('.sb-col.'+s); this.sides[s]={img:q('.sb-logo.'+s+' img'),name:c.querySelector('.sb-name'),score:c.querySelector('.sb-score')}; });
+    this.mediaEl=null;
+  }
+  place(x,y,scale){
+    const S=state.settings;
+    this.el.style.width=S.w+'px'; this.el.style.height=S.h+'px';
+    this.el.style.left=x+'px'; this.el.style.top=y+'px';
+    this.el.style.transform=`scale(${scale})`;
+  }
+  render(){
+    const S=state.settings, H=S.h, W=S.w;
+    this.el.style.fontFamily=`"${S.font}", "Arial Black", Arial, sans-serif`;
+    this.el.style.background=S.bg;
+    this.over.style.background=S.bg; this.over.style.color=S.msgCol;
+    this.bg.style.backgroundImage = S.bgImageId && mediaURL(S.bgImageId) ? `url("${mediaURL(S.bgImageId)}")` : 'none';
+    for(const s of ['home','away']){
+      const t=teamFor(s), e=this.sides[s];
+      e.name.textContent=t.name;
+      e.name.style.color=t.textColour;
+      const len=Math.max(1,t.name.length);
+      e.name.style.fontSize=Math.min(H*0.11, (W*0.34)/(len*0.74))+'px';
+      const u=t.logoId?mediaURL(t.logoId):null;
+      if(u){ if(e.img.getAttribute('src')!==u) e.img.src=u; e.img.style.display=''; } else { e.img.removeAttribute('src'); e.img.style.display='none'; }
+      const sc=state[s].score; e.score.textContent=sc;
+      e.score.style.color=S.scoreCol;
+      e.score.style.fontSize=(sc>=100? H*0.24 : H*0.31)+'px';
+    }
+    this.mid.style.display=S.showClock?'flex':'none';
+    this.clock.style.color=S.clockCol; this.half.style.color=S.clockCol;
+    this.half.style.fontSize=(H*0.055)+'px';
+    this.test.style.display=S.test?'block':'none';
+    this.test.querySelector('.sz').textContent=`${W} × ${H}`;
+    this.renderClock(); this.renderCentre(true);
+  }
+  renderClock(){
+    const H=state.settings.h, st=state.clock.status;
+    let big, small='', smallFirst=false, size=0.15;
+    if(st==='ht'||st==='ft'){ big= st==='ht'?'HALF<br>TIME':'FULL<br>TIME'; size=0.10; }
+    else if(st==='pre' && kickoffInfo()){ const k=kickoffInfo(); big=k.text; small='KICK-OFF'; smallFirst=true; }
+    else { const ms=clockMs(); big=fmtClock(ms); if(ms>=6000000) size=0.115; small= st==='h1'?'1ST HALF':st==='h2'?'2ND HALF':''; }
+    if(this.clock.innerHTML!==big) this.clock.innerHTML=big;
+    this.clock.style.fontSize=(H*size)+'px';
+    this.half.textContent=small; this.half.style.order=smallFirst?0:2; this.half.style.display=small?'':'none';
+  }
+  renderCentre(force){
+    const S=state.settings, H=S.h;
+    const bins=binList();
+    if(bins.length){
+      this.binsBox.style.display='flex'; this.spons.style.display='none';
+      const sig=bins.map(b=>b.id+b.text+b.done).join('|');
+      if(force || sig!==this.binsSig){
+        this.binsSig=sig;
+        for(const side of ['home','away']){
+          this.binCols[side].innerHTML=bins.filter(b=>b.side===side).slice(0,3).map(b=>
+            `<div class="sb-bin ${b.done?'done':''}"><div class="sb-card" style="width:${H*0.045}px;height:${H*0.062}px"></div><div class="sb-bintime" style="font-size:${H*0.068}px">${b.text}</div></div>`).join('');
+        }
+      }
+      return;
+    }
+    this.binsBox.style.display='none';
+    const sp=sponsorList();
+    if(!S.sponsorsOn || !sp.length){ this.spons.style.display='none'; this.sponsIdx=-1; return; }
+    this.spons.style.display='';
+    const idx=Math.floor(Date.now()/(Math.max(3,S.sponsorSecs)*1000))%sp.length;
+    if(idx!==this.sponsIdx || force){
+      const url=mediaURL(sp[idx].id);
+      const front=this.sponsImgs[this.sponsFront];
+      if(front.getAttribute('src')!==url){
+        const next=this.sponsImgs[1-this.sponsFront];
+        next.src=url; next.classList.add('on'); front.classList.remove('on'); this.sponsFront=1-this.sponsFront;
+      } else front.classList.add('on');
+      this.sponsIdx=idx;
+    }
+  }
+  flash(side){ const e=this.sides[side].score; e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop'); }
+  showMedia(item, loop){
+    this.clearAll();
+    const d=this.doc, url=mediaURL(item.id);
+    let m;
+    if(item.kind==='video'){ m=d.createElement('video'); m.src=url; m.playsInline=true; m.loop=loop; m.muted=!this.audible; m.autoplay=true; }
+    else { m=d.createElement('img'); m.src=url; }
+    this.media.appendChild(m); this.media.style.display='block'; this.mediaEl=m;
+    if(m.play) m.play().catch(()=>{});
+    return m;
+  }
+  showMessage(text){
+    this.clearAll();
+    const S=state.settings, W=S.w, H=S.h;
+    const lines=wrapText(text, W, H);
+    const maxLen=Math.max(...lines.map(l=>l.length),1);
+    const fs=Math.min(H*0.24, (H*0.9)/(lines.length*1.12), (W*0.94)/(maxLen*0.68));
+    this.over.textContent=lines.join('\n'); this.over.style.fontSize=fs+'px'; this.over.style.display='flex';
+  }
+  clearAll(){
+    if(this.mediaEl){ try{ this.mediaEl.pause&&this.mediaEl.pause(); }catch(e){} this.mediaEl.remove(); this.mediaEl=null; }
+    this.media.style.display='none'; this.over.style.display='none';
+  }
+}
+function wrapText(text, W, H){
+  text=String(text).toUpperCase().trim();
+  const given=text.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(given.length>1) return given;
+  const words=text.split(/\s+/), n=text.length;
+  const wrapTo=t=>{ const out=[]; let cur=''; for(const w of words){ if(cur && (cur+' '+w).length>t){ out.push(cur); cur=w; } else cur=cur?cur+' '+w:w; } if(cur) out.push(cur); return out; };
+  let best=[text], bestFs=0;
+  for(let L=1; L<=5; L++){
+    let lines=null;
+    for(let t=Math.ceil(n/L); t<=n; t++){ const w=wrapTo(t); if(w.length<=L){ lines=w; break; } }
+    if(!lines) continue;
+    const maxLen=Math.max(...lines.map(l=>l.length));
+    const fs=Math.min((H*0.9)/(lines.length*1.12),(W*0.94)/(maxLen*0.68));
+    if(fs>bestFs+0.5){ bestFs=fs; best=lines; }
+  }
+  return best;
+}
+
+/* =====================================================================
+   STATE & STORAGE
+   ===================================================================== */
+const DEFAULT = {
+  home:{teamId:null,score:0}, away:{teamId:null,score:0},
+  clock:{running:false,startedAt:0,baseMs:0,status:'pre'},
+  view:'full', history:[], bins:[], messages:['WELCOME','RAFFLE DRAW AT HALF TIME'], presets:[],
+  settings:{w:400,h:270,x:0,y:0,bg:'#000000',bgImageId:null,font:'Arial Black',scoreCol:'#6dff9e',clockCol:'#7fd8ff',msgCol:'#ffffff',
+            showClock:true,mirror:true,test:false,autoAnim:true,loop:false,flash:true,
+            halfLen:40,binMins:10,kickoff:'',beep:false,
+            sponsorsOn:false,sponsorSecs:15,reelGap:10,reelImg:8,autoReel:false,displayId:'auto',globalKeys:false}
+};
+let state = load();
+function load(){
+  try{ const s=JSON.parse(localStorage.getItem('rugbySB_state')); if(s){ return {...JSON.parse(JSON.stringify(DEFAULT)),...s,settings:{...DEFAULT.settings,...s.settings},clock:{...DEFAULT.clock,...s.clock}}; } }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT));
+}
+function save(){ try{ localStorage.setItem('rugbySB_state',JSON.stringify(state)); }catch(e){} }
+const S_ = () => state.settings;
+
+let teams=[], media=[], db=null;
+const urlCache={};
+function idb(){ return new Promise((res,rej)=>{ let r; try{ r=indexedDB.open('rugby-scoreboard',1);}catch(e){return rej(e);}
+  r.onupgradeneeded=()=>{const d=r.result; d.createObjectStore('teams',{keyPath:'id'}); d.createObjectStore('media',{keyPath:'id'});};
+  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });}
+function tx(store,mode,fn){ return new Promise((res,rej)=>{ if(!db) return res(null); const t=db.transaction(store,mode); const r=fn(t.objectStore(store)); t.oncomplete=()=>res(r&&r.result); t.onerror=()=>rej(t.error); }); }
+const dbAll = s => tx(s,'readonly',os=>os.getAll()).then(r=>r||[]);
+const dbPut = (s,o) => tx(s,'readwrite',os=>os.put(o)).catch(e=>{console.warn(e); toast('Could not save file (disk full?)');});
+const dbDel = (s,id) => tx(s,'readwrite',os=>os.delete(id));
+const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
+
+function mediaURL(id){ if(!id) return null; if(urlCache[id]) return urlCache[id]; const m=media.find(x=>x.id===id); if(!m) return null; return urlCache[id]=URL.createObjectURL(m.blob); }
+async function addMediaFile(file, opts){
+  const kind = file.type.startsWith('video')?'video':'image';
+  const m={id:uid(),name:file.name.replace(/\.[^.]+$/,''),kind,blob:file,inLibrary:!!opts.library,sponsor:!!opts.sponsor,reel:false,order:Date.now()+Math.random()};
+  media.push(m); await dbPut('media',m); return m;
+}
+async function removeMedia(id){ media=media.filter(m=>m.id!==id); if(urlCache[id]){URL.revokeObjectURL(urlCache[id]); delete urlCache[id];} await dbDel('media',id); }
+const libList = () => media.filter(m=>m.inLibrary).sort((a,b)=>a.order-b.order);
+const sponsorList = () => media.filter(m=>m.sponsor).sort((a,b)=>a.order-b.order);
+
+function teamFor(side){
+  return teams.find(t=>t.id===state[side].teamId) || {name:side==='home'?'HOME':'AWAY',colour:side==='home'?'#c8102e':'#1f4fa3',textColour:'#ffffff',logoId:null,tryAnimId:null};
+}
+
+/* =====================================================================
+   CLOCK
+   ===================================================================== */
+function clockMs(){ const c=state.clock; return c.baseMs + (c.running? Date.now()-c.startedAt : 0); }
+function fmtClock(ms){ const t=Math.floor(Math.max(0,ms)/1000); return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); }
+function kickoffInfo(){
+  const k=S_().kickoff; if(!k) return null;
+  const [h,m]=k.split(':').map(Number); const t=new Date(); t.setHours(h,m,0,0);
+  const diff=t-Date.now();
+  if(diff>0 && diff<=3600000) return {text:fmtClock(diff+999)};
+  return {text:k};
+}
+function clockToggle(){ const c=state.clock;
+  if(c.running){ c.baseMs=clockMs(); c.running=false; }
+  else { c.startedAt=Date.now(); c.running=true; if(c.status==='pre') c.status='h1'; else if(c.status==='ht') { c.status='h2'; c.baseMs=Math.max(c.baseMs, S_().halfLen*60000); c.startedAt=Date.now(); } }
+  save(); renderAll(); toast(c.running?'Clock started':'Clock stopped');
+}
+function clockSet(ms){ const c=state.clock; c.baseMs=ms; c.startedAt=Date.now(); save(); renderAll(); }
+function setStatus(st){ const c=state.clock, L=S_().halfLen*60000;
+  if(st==='ht'||st==='ft'){ if(c.running){ c.baseMs=clockMs(); c.running=false; } }
+  if(st==='h2' && !c.running && c.baseMs<L) c.baseMs=L;
+  if(st==='h1' && c.status==='pre') c.baseMs=0;
+  c.status=st; save(); renderAll();
+  if(st==='ht' && S_().autoReel) startReel();
+}
+let alerted={};
+function checkClockAlert(){
+  const st=state.clock.status, L=S_().halfLen*60000;
+  const due = st==='h1'?L : st==='h2'?2*L : null;
+  const over = due!==null && clockMs()>=due;
+  document.querySelectorAll('[data-clock]').forEach(e=>e.classList.toggle('alert', over && state.clock.running));
+  if(over && state.clock.running){
+    setAlert('clock',`⏱ ${fmtClock(due)} reached – end of the ${st==='h1'?'first':'second'} half. Stop the clock when the referee blows.`,'bad');
+    if(!alerted[st]){ alerted[st]=true; if(S_().beep) beep(); }
+  } else { setAlert('clock',null); if(!over) alerted[st]=false; }
+}
+function beep(){ try{ const a=new (window.AudioContext||window.webkitAudioContext)(); [0,0.35,0.7].forEach(t=>{ const o=a.createOscillator(), g=a.createGain(); o.frequency.value=880; o.connect(g); g.connect(a.destination); g.gain.setValueAtTime(0.25,a.currentTime+t); g.gain.setValueAtTime(0,a.currentTime+t+0.2); o.start(a.currentTime+t); o.stop(a.currentTime+t+0.22); }); }catch(e){} }
+
+/* =====================================================================
+   SIN BINS (count down with the match clock)
+   ===================================================================== */
+function addBin(side){
+  state.bins.push({id:uid(),side,start:clockMs(),dur:S_().binMins*60000,doneAt:0});
+  save(); renderAll(); toast(`${teamFor(side).name}: sin bin ${S_().binMins} min`);
+  if(!state.clock.running) toast('Sin bin added – it counts down when the clock is running');
+}
+function removeBin(id){ state.bins=state.bins.filter(b=>b.id!==id); save(); renderAll(); }
+function binList(){
+  const now=clockMs();
+  return state.bins.map(b=>{ const rem=Math.min(b.dur, b.dur-(now-b.start)); return {...b, rem, done:rem<=0, text:fmtClock(rem>0?rem+999:0)}; });
+}
+function tickBins(){
+  let changed=false;
+  for(const b of binList()){
+    const sb=state.bins.find(x=>x.id===b.id);
+    if(b.done && !sb.doneAt){ sb.doneAt=Date.now(); changed=true; toast(`${teamFor(b.side).name}: sin bin over`); }
+    if(!b.done && sb.doneAt){ sb.doneAt=0; changed=true; }
+  }
+  const before=state.bins.length;
+  state.bins=state.bins.filter(b=>!(b.doneAt && Date.now()-b.doneAt>8000));
+  if(changed || before!==state.bins.length) save();
+  renderBinChips();
+}
+function renderBinChips(){
+  const list=binList();
+  document.querySelectorAll('[data-bins]').forEach(box=>{
+    const html=list.filter(b=>b.side===box.dataset.bins).map(b=>`<span class="chip"><i></i>${b.done?'OVER':b.text}<button data-unbin="${b.id}" title="Remove">✕</button></span>`).join('');
+    if(box.innerHTML!==html) box.innerHTML=html;
+  });
+}
+
+/* =====================================================================
+   SCORING
+   ===================================================================== */
+function addPoints(side,pts,lbl){
+  if(state[side].score+pts<0) return;
+  state[side].score+=pts;
+  state.history.push({side,pts,lbl});
+  if(state.history.length>200) state.history.shift();
+  save(); renderAll();
+  if(pts>0 && S_().flash) for(const s of stages()) s.flash(side);
+  const t=teamFor(side).name;
+  setLast(`${t}: ${lbl} (${pts>0?'+':''}${pts})`);
+  toast(`${t} ${lbl} ${pts>0?'+':''}${pts}`);
+  if(lbl==='Try' && S_().autoAnim) playTryAnim(side, true);
+}
+function undo(){ const h=state.history.pop(); if(!h){toast('Nothing to undo');return;} state[h.side].score-=h.pts; save(); renderAll(); setLast(`Undid: ${teamFor(h.side).name} ${h.lbl}`); toast('Undone'); }
+function playTryAnim(side, quiet){ const t=teamFor(side); const m=t.tryAnimId && media.find(x=>x.id===t.tryAnimId);
+  if(m) playMedia(m,false); else if(!quiet) toast(`No try animation set for ${t.name}`); }
+function setLast(s){ document.querySelectorAll('[data-last]').forEach(e=>e.textContent=s); }
+
+/* =====================================================================
+   OUTPUT WINDOW
+   ===================================================================== */
+let outWin=null, outStage=null, mirrorStage=null, previewStage=null;
+const OUT_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>SCOREBOARD OUTPUT</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}
+#hint{position:absolute;right:16px;bottom:12px;color:#777;font:13px -apple-system,"Segoe UI",Arial;text-align:right;cursor:default}
+#mlabel{position:absolute;color:#555;font:12px -apple-system,"Segoe UI",Arial}</style></head>
+<body><div id="root"></div><div id="hint">Drag this window onto the scoreboard screen,<br>then <b>double-click</b> to go full screen.</div><div id="mlabel"></div></body></html>`;
+
+function openOutput(){
+  let w = window.open('', 'rugbySB_output', 'width=900,height=500');
+  if(!w){ alert('The scoreboard window was blocked. Allow pop-ups for this page and try again.'); return; }
+  try{ w.document.open(); w.document.write(OUT_HTML); w.document.close(); }
+  catch(e){
+    w = window.open('', 'rugbySB_output_'+Date.now(), 'width=900,height=500');
+    if(!w) return;
+    w.document.open(); w.document.write(OUT_HTML); w.document.close();
+    toast('Opened a new scoreboard window – close the old one');
+  }
+  outWin=w;
+  const d=w.document, root=d.getElementById('root');
+  outStage=new Stage(root,{audible:true});
+  mirrorStage=new Stage(root,{});
+  previewStage.audible=false; if(previewStage.mediaEl) previewStage.mediaEl.muted=true;
+  d.addEventListener('dblclick',()=>{ if(!d.fullscreenElement) d.documentElement.requestFullscreen().catch(()=>{}); });
+  d.addEventListener('keydown',onKey);
+  w.addEventListener('resize',layoutOutput);
+  w.addEventListener('beforeunload',()=>{ dropOutput(); });
+  layoutOutput(); renderAll();
+  // carry over whatever is currently showing
+  if(current){ const c=current; if(c.type==='media'){ const t=c.el&&c.el.currentTime; for(const s of [outStage,mirrorStage]){ const el=s.showMedia(c.item,c.loop); if(t&&el.currentTime!==undefined) el.currentTime=t; } }
+               else if(c.type==='message'){ outStage.showMessage(c.text); mirrorStage.showMessage(c.text); } }
+  updateOutStatus();
+}
+function dropOutput(){ outWin=null; outStage=null; mirrorStage=null; previewStage.audible=true; updateOutStatus(); checkOutput(); }
+function outOpen(){ return !!(outWin && !outWin.closed && outStage); }
+function layoutOutput(){
+  if(!outOpen()) return;
+  const S=S_(), dpr=outWin.devicePixelRatio||1;
+  outStage.place(S.x/dpr, S.y/dpr, 1/dpr);   // 1 scoreboard pixel = 1 physical screen pixel
+  const W=outWin.innerWidth, H=outWin.innerHeight;
+  const right=(S.x+S.w)/dpr, bottom=(S.y+S.h)/dpr;
+  const hint=outWin.document.getElementById('hint'), ml=outWin.document.getElementById('mlabel');
+  hint.style.display = (outWin.document.fullscreenElement || (API && !practicing))?'none':'';
+  const pad=20;
+  const areas=[{x:right+pad,y:pad,w:W-right-2*pad,h:H-2*pad},{x:pad,y:bottom+pad,w:W-2*pad,h:H-bottom-2*pad}];
+  let best=null,bs=0;
+  for(const a of areas){ if(a.w<=0||a.h<=0) continue; const s=Math.min(a.w/S.w,a.h/S.h); if(s>bs){bs=s;best=a;} }
+  if(S.mirror && best && bs>0.5){
+    const mw=S.w*bs, mh=S.h*bs, mx=best.x+(best.w-mw)/2, my=best.y+(best.h-mh)/2;
+    mirrorStage.el.style.display=''; mirrorStage.place(mx,my,bs);
+    ml.style.display=(my+mh+20>H)?'none':''; ml.style.left=mx+'px'; ml.style.top=(my+mh+4)+'px'; ml.textContent='Monitor copy – not shown on LED';
+  } else { mirrorStage.el.style.display='none'; ml.style.display='none'; }
+}
+function updateOutStatus(){
+  const p=$('outStatus'), b=$('btnOpenOut'), open=outOpen();
+  p.textContent = open ? 'Scoreboard window: connected' : 'Scoreboard window: not open';
+  p.classList.toggle('ok',open);
+  b.textContent = open ? 'Reconnect scoreboard window' : 'Open scoreboard window';
+  $('liveTag').style.display = open?'':'none';
+}
+function stages(){ const a=[previewStage]; if(outOpen()) a.push(outStage,mirrorStage); return a; }
+let appTarget=null;
+function checkOutput(){
+  if(API && !practicing){
+    setAlert('display', appTarget ? null : 'No scoreboard connected. Plug in the HDMI cable – the scoreboard picks up automatically.', 'bad');
+    setAlert('fs', null); return;
+  }
+  if(!outOpen()){ setAlert('display',null); setAlert('fs',null); return; }
+  let same=false, fs=false;
+  try{ const a=outWin.screen, b=window.screen;
+       same = a.availLeft===b.availLeft && a.availTop===b.availTop && a.width===b.width && a.height===b.height;
+       fs = !!outWin.document.fullscreenElement; }catch(e){}
+  setAlert('display', same ? '⚠ The scoreboard window is on your laptop screen. Drag it onto the scoreboard display – if it was already there, check the HDMI cable.' : null, 'bad');
+  setAlert('fs', (!same && !fs) ? 'The scoreboard window isn\'t full screen yet – double-click it.' : null, 'warn');
+}
+
+/* =====================================================================
+   SHOWING VIDEOS, GRAPHICS, MESSAGES & THE REEL
+   ===================================================================== */
+let current=null;   // {type:'media'|'message', item, loop, el, text}
+let reel=null;      // {i, timer}
+function playMedia(item, loop, fromReel){
+  if(!item) return;
+  if(!fromReel) stopReel();
+  const master = outOpen() ? outStage : previewStage;
+  let masterEl=null;
+  for(const s of stages()){ const el=s.showMedia(item,loop); if(s===master) masterEl=el; }
+  current={type:'media',item,loop,el:masterEl};
+  if(item.kind==='video') masterEl.addEventListener('ended',()=>{ if(current && current.el===masterEl && !loop) endCurrent(); });
+  updateNP();
+}
+function showMessage(text){
+  text=String(text||'').trim(); if(!text) return;
+  stopReel();
+  for(const s of stages()) s.showMessage(text);
+  current={type:'message',text}; updateNP();
+}
+function endCurrent(){
+  if(reel){ for(const s of stages()) s.clearAll(); current=null; updateNP(); clearTimeout(reel.timer); reel.timer=setTimeout(reelNext, S_().reelGap*1000); }
+  else backToScores(false);
+}
+function backToScores(user=true){
+  if(user!==false) stopReel();
+  for(const s of stages()) s.clearAll();
+  current=null; updateNP();
+}
+function startReel(){
+  if(!libList().some(m=>m.reel)){ toast('Tick "In reel" on some videos or graphics first'); return; }
+  stopReel(); reel={i:-1,timer:null}; reelNext(); updateNP();
+}
+function reelNext(){
+  if(!reel) return;
+  const items=libList().filter(m=>m.reel); if(!items.length){ stopReel(); return; }
+  reel.i=(reel.i+1)%items.length; const m=items[reel.i];
+  playMedia(m,false,true);
+  if(m.kind==='image'){ clearTimeout(reel.timer); reel.timer=setTimeout(endCurrent, S_().reelImg*1000); }
+}
+function stopReel(){ if(reel){ clearTimeout(reel.timer); reel=null; updateNP(); } }
+function toggleReel(){ if(reel) backToScores(); else startReel(); }
+function updateNP(){
+  let t;
+  if(!current) t='Showing: <b>Scoreboard</b>'+(reel?' <span class="hint">(reel – next item in a moment)</span>':'');
+  else if(current.type==='message') t=`Showing message: <b>${esc(current.text.replace(/\n/g,' / '))}</b>`;
+  else t=`Showing: <b>${esc(current.item.name)}</b> ${current.item.kind==='video'?(current.loop?'(looping video)':'(video)'):'(graphic)'}${reel?' <span class="hint">– reel playing</span>':''}`;
+  $('npText').innerHTML=t;
+  $('btnReel').innerHTML = reel ? '■ Stop reel <kbd>pad +</kbd>' : '▶ Play reel <kbd>pad +</kbd>';
+  $('btnReel').className = reel ? 'bad' : 'primary';
+  if(!current) document.querySelector('#progress div').style.width='0';
+  renderMediaList();
+}
+
+/* =====================================================================
+   EASY VIEW
+   ===================================================================== */
+function easyStage(st){
+  const c=state.clock, L=S_().halfLen*60000;
+  if(st==='kick'){ if(c.status!=='pre' && clockMs()>0 && !confirm('Restart the match clock from 0:00?')) return;
+    c.status='h1'; c.baseMs=0; c.startedAt=Date.now(); c.running=true; save(); renderAll(); toast('Kick off – clock running'); }
+  if(st==='ht') setStatus('ht');
+  if(st==='h2'){ stopReel(); if(current) backToScores(); c.status='h2'; c.baseMs=L; c.startedAt=Date.now(); c.running=true; save(); renderAll(); toast('Second half – clock running'); }
+  if(st==='ft') setStatus('ft');
+}
+function setView(v){
+  state.view=v; save();
+  document.body.classList.toggle('easy', v==='easy');
+  $('btnView').textContent = v==='easy' ? 'Full view' : 'Easy view';
+  $(v==='easy'?'holderEasy':'holderFull').appendChild($('previewBlock'));
+  if(v==='easy'){ document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='page-easy')); }
+  else { document.querySelector('.tabs button[data-tab=match]').click(); }
+  layoutPreview();
+}
+
+/* =====================================================================
+   CONTROL UI
+   ===================================================================== */
+const $=id=>document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+let toastT; function toast(s){ const t=$('toast'); t.textContent=s; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1600); }
+const alerts={};
+function setAlert(key,text,cls){ const cur=alerts[key]; if(text){ if(cur&&cur.text===text) return; alerts[key]={text,cls:cls||'warn'}; } else { if(!cur) return; delete alerts[key]; }
+  $('alerts').innerHTML=Object.values(alerts).map(a=>`<div class="${a.cls}">${esc(a.text)}</div>`).join(''); }
+
+function renderAll(){
+  for(const s of stages()) s.render();
+  layoutPreview(); layoutOutput();
+  document.querySelectorAll('[data-score]').forEach(e=>e.textContent=state[e.dataset.score].score);
+  document.querySelectorAll('[data-card]').forEach(e=>e.style.borderTopColor=teamFor(e.dataset.card).colour);
+  document.querySelectorAll('[data-clock]').forEach(e=>e.textContent=fmtClock(clockMs()));
+  document.querySelectorAll('[data-act=clock]').forEach(b=>{ const run=state.clock.running;
+    if(b.hasAttribute('data-kbd')){ b.innerHTML=(run?'Stop':'Start')+' <kbd>Space</kbd>'; b.className=(run?'bad':'good')+' big'; }
+    else { b.textContent=run?'■ Stop clock':'▶ Start clock'; b.className=(run?'bad':'good')+' ebig'; } });
+  const stMap={pre:'',h1:'kick',ht:'ht',h2:'h2',ft:'ft'};
+  document.querySelectorAll('[data-stage]').forEach(b=>b.classList.toggle('on', b.dataset.stage===stMap[state.clock.status]));
+  $('selStatus').value=state.clock.status;
+  $('btnClock40').textContent=`Set ${S_().halfLen}:00`;
+  for(const [id,k] of [['chkShowClock','showClock'],['chkAutoAnim','autoAnim'],['chkLoop','loop'],['chkFlash','flash'],['chkSponsors','sponsorsOn'],['chkBeep','beep'],['chkAutoReel','autoReel']]) $(id).checked=!!S_()[k];
+  renderBinChips();
+}
+function layoutPreview(){ const w=$('previewWrap').clientWidth||400, S=S_(); previewStage.place(0,0,w/S.w); $('previewWrap').style.aspectRatio=`${S.w}/${S.h}`; }
+
+function renderTeamSelects(){
+  const used=new Set(teams.map(t=>t.clubKey).filter(Boolean));
+  const spare=clubs.filter(c=>!used.has(c.key));
+  const clubOpts = spare.length ? `<optgroup label="Club list">${spare.map(c=>`<option value="club:${esc(c.key)}">${esc(c.name)}</option>`).join('')}</optgroup>` : '';
+  document.querySelectorAll('.teamSel').forEach(sel=>{
+    const side=sel.dataset.team;
+    sel.innerHTML=`<option value="">— ${side==='home'?'Home':'Away'} team —</option><optgroup label="Your teams">${teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>${clubOpts}`;
+    sel.value=state[side].teamId||'';
+  });
+  if($('selClubAdd')){ $('selClubAdd').innerHTML = spare.length ? spare.map(c=>`<option value="${esc(c.key)}">${esc(c.name)}</option>`).join('') : '<option value="">(all clubs added)</option>'; }
+}
+async function importClub(c){
+  let t=teams.find(x=>x.clubKey===c.key); if(t) return t;
+  t={id:uid(),name:c.board||c.name,colour:c.colour||'#2f7df6',textColour:c.nameColour||'#ffffff',logoId:null,tryAnimId:null,clubKey:c.key};
+  if(c.badge && API){
+    try{ const bytes=await API.badge(c.badge);
+         const type=/\.svg$/i.test(c.badge)?'image/svg+xml':/\.jpe?g$/i.test(c.badge)?'image/jpeg':/\.webp$/i.test(c.badge)?'image/webp':'image/png';
+         t.logoId=(await addMediaFile(new File([bytes],c.badge,{type}),{})).id; }
+    catch(e){ toast(`Badge file not found for ${c.name}`); }
+  }
+  teams.push(t); await dbPut('teams',t); return t;
+}
+async function chooseTeam(side,val){
+  if(val && val.startsWith('club:')){ const c=clubs.find(x=>x.key===val.slice(5)); if(c) val=(await importClub(c)).id; }
+  state[side].teamId=val||null; save(); renderTeamSelects(); renderTeamEditor(); renderAll();
+}
+function renderMediaList(){
+  const list=libList(), box=$('mediaList');
+  if(!list.length){ box.innerHTML='<div class="hint">No videos or graphics yet. Add run-on videos, sponsor adverts, half-time graphics…</div>'; box.dataset.sig=''; renderEasyVids(); return; }
+  const playingId=current&&current.type==='media'?current.item.id:null;
+  const html=list.map((m,i)=>`<div class="item ${playingId===m.id?'playing':''}" data-id="${m.id}">
+      ${m.kind==='video'?`<video class="thumb" src="${mediaURL(m.id)}#t=1" muted preload="metadata"></video>`:`<img class="thumb" src="${mediaURL(m.id)}">`}
+      <div class="nm">${i<9?`<kbd>F${i+1}</kbd> `:''}${esc(m.name)} <span class="hint">${m.kind==='video'?'video':'graphic'}</span></div>
+      <label><input type="checkbox" data-act="reel" ${m.reel?'checked':''}> In reel</label>
+      <button class="primary" data-act="play">▶ Show</button>
+      <button data-act="up" title="Move up">↑</button>
+      <button data-act="del" title="Remove">✕</button></div>`).join('');
+  // only rebuild when something changed (keeps video thumbnails from flickering)
+  if(box.dataset.sig!==html){ box.innerHTML=html; box.dataset.sig=html; }
+  renderEasyVids();
+}
+function renderEasyVids(){
+  const playingId=current&&current.type==='media'?current.item.id:null;
+  const list=libList().slice(0,11);
+  const html=list.map(m=>`<button data-id="${m.id}" class="${playingId===m.id?'on':''}">${m.kind==='video'?'▶ ':''}${esc(m.name)}</button>`).join('')
+    + (libList().some(m=>m.reel)?`<button data-reel class="${reel?'bad':'primary'}">${reel?'■ Stop reel':'▶ Sponsor reel'}</button>`:'')
+    || '<span class="hint">Add videos in Full view.</span>';
+  const box=$('easyVids'); if(box.dataset.sig!==html){ box.innerHTML=html; box.dataset.sig=html; }
+}
+function renderTeamEditor(){
+  const box=$('teamList');
+  if(!teams.length){ box.innerHTML='<p class="hint">No teams yet.</p>'; return; }
+  box.innerHTML=teams.map(t=>{
+    const logo=t.logoId?mediaURL(t.logoId):null, anim=t.tryAnimId&&media.find(m=>m.id===t.tryAnimId);
+    return `<div class="teamEdit" data-id="${t.id}">
+      <div class="logo" style="${logo?`background-image:url('${logo}')`:''}"></div>
+      <div class="fields">
+        <div class="col"><label>Team name (as shown)</label><input data-f="name" value="${esc(t.name)}" style="width:200px"></div>
+        <div class="col"><label>Name colour</label><input type="color" data-f="textColour" value="${t.textColour}"></div>
+        <div class="col"><label>Team colour (control screen)</label><input type="color" data-f="colour" value="${t.colour}"></div>
+        <div class="col"><label>Logo</label><button data-act="logo">${logo?'Change logo':'Add logo'}</button></div>
+        <div class="col"><label>Try animation</label><div class="row"><button data-act="anim">${anim?'Change':'Add'} video</button>${anim?`<span class="hint">${esc(anim.name)}</span> <button data-act="testanim" title="Preview">▶</button>`:''}</div></div>
+      </div>
+      <button class="bad" data-act="del">Delete</button></div>`; }).join('');
+}
+function renderSponsors(){
+  const sp=sponsorList();
+  $('sponsorGrid').innerHTML = sp.length ? sp.map(m=>`<div class="sp" data-id="${m.id}" style="background-image:url('${mediaURL(m.id)}')"><button class="l" data-act="left" title="Move earlier">←</button><button class="x" data-act="del" title="Remove">✕</button></div>`).join('')
+                                         : '<span class="hint">No sponsor logos yet.</span>';
+}
+function renderMessages(){
+  $('easyMsgs').innerHTML = state.messages.map((m,i)=>`<button data-i="${i}">${esc(m.replace(/\n/g,' / '))}</button>`).join('') || '<span class="hint">Save messages in Full view.</span>';
+  $('msgList').innerHTML = state.messages.map((m,i)=>`<div class="item" data-i="${i}"><div class="nm">${esc(m.replace(/\n/g,' / '))}</div><button class="primary" data-act="show">Show</button><button data-act="edit" title="Edit">✎</button><button data-act="del" title="Remove">✕</button></div>`).join('');
+}
+function renderPresets(){
+  $('selPreset').innerHTML='<option value="">— saved match setups —</option>'+state.presets.map((p,i)=>`<option value="${i}">${esc(p.name)}</option>`).join('');
+}
+function pickFile(accept, multiple){ return new Promise(res=>{ const i=document.createElement('input'); i.type='file'; i.accept=accept; i.multiple=!!multiple; i.onchange=()=>res([...i.files]); i.click(); }); }
+
+/* ---------- wiring ---------- */
+function wire(){
+  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+    document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='page-'+b.dataset.tab));
+    layoutPreview();
+  });
+  $('btnOpenOut').onclick=openOutput;
+  document.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>addPoints(b.dataset.side,+b.dataset.pts,b.dataset.lbl));
+  document.querySelectorAll('[data-anim]').forEach(b=>b.onclick=()=>playTryAnim(b.dataset.anim));
+  document.querySelectorAll('[data-bin]').forEach(b=>b.onclick=()=>addBin(b.dataset.bin));
+  document.addEventListener('click',e=>{ const b=e.target.closest('[data-unbin]'); if(b) removeBin(b.dataset.unbin); });
+  document.querySelectorAll('[data-act=undo]').forEach(b=>b.onclick=undo);
+  $('btnBack').onclick=()=>backToScores();
+  $('btnResetMatch').onclick=()=>{ if(!confirm('Start a new match? Scores, clock and sin bins go back to zero (teams, files and messages are kept).')) return;
+    state.home.score=0; state.away.score=0; state.history=[]; state.bins=[]; state.clock={...DEFAULT.clock}; save(); backToScores(); renderAll(); setLast(''); };
+  document.querySelectorAll('.teamSel').forEach(sel=>sel.onchange=e=>chooseTeam(sel.dataset.team,e.target.value));
+  document.querySelectorAll('[data-act=clock]').forEach(b=>b.onclick=clockToggle);
+  document.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>easyStage(b.dataset.stage));
+  $('btnView').onclick=()=>setView(state.view==='easy'?'full':'easy');
+  $('easyVids').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.reel!==undefined) return toggleReel(); const m=media.find(x=>x.id===b.dataset.id); if(m) playMedia(m,S_().loop); };
+  $('easyMsgs').onclick=e=>{ const b=e.target.closest('button'); if(b) showMessage(state.messages[+b.dataset.i]); };
+  $('btnClubAdd').onclick=async()=>{ const c=clubs.find(x=>x.key===$('selClubAdd').value); if(!c) return; await importClub(c); renderTeamEditor(); renderTeamSelects(); toast(`Added ${c.name}`); };
+  $('btnClock0').onclick=()=>clockSet(0);
+  $('btnClock40').onclick=()=>clockSet(S_().halfLen*60000);
+  $('btnSetTime').onclick=()=>{ const m=$('inpTime').value.trim().match(/^(\d{1,3})(?::(\d{1,2}))?$/); if(!m){toast('Type time as mm:ss');return;} clockSet((+m[1]*60+(+m[2]||0))*1000); $('inpTime').value=''; };
+  $('selStatus').onchange=e=>setStatus(e.target.value);
+  for(const [id,k] of [['chkShowClock','showClock'],['chkAutoAnim','autoAnim'],['chkLoop','loop'],['chkFlash','flash'],['chkSponsors','sponsorsOn'],['chkBeep','beep'],['chkAutoReel','autoReel']])
+    $(id).onchange=e=>{ S_()[k]=e.target.checked; save(); renderAll(); };
+
+  // presets
+  $('btnSavePreset').onclick=()=>{ const name=prompt('Name for this match setup (e.g. "Stags v Vets"):', `${teamFor('home').name} v ${teamFor('away').name}`); if(!name) return;
+    const p={name,home:state.home.teamId,away:state.away.teamId,kickoff:S_().kickoff,sponsorsOn:S_().sponsorsOn,reel:media.filter(m=>m.reel).map(m=>m.id)};
+    const i=state.presets.findIndex(x=>x.name===name); if(i>=0) state.presets[i]=p; else state.presets.push(p);
+    save(); renderPresets(); $('selPreset').value=String(state.presets.findIndex(x=>x.name===name)); toast('Match setup saved'); };
+  $('btnLoadPreset').onclick=async()=>{ const p=state.presets[$('selPreset').value]; if(!p){toast('Pick a saved setup first');return;}
+    state.home.teamId=p.home; state.away.teamId=p.away; S_().kickoff=p.kickoff||''; S_().sponsorsOn=!!p.sponsorsOn;
+    for(const m of media){ const want=p.reel.includes(m.id); if(m.reel!==want){ m.reel=want; await dbPut('media',m); } }
+    $('setKickoff').value=S_().kickoff; save(); renderTeamSelects(); renderAll(); renderMediaList(); toast(`Loaded: ${p.name}`); };
+  $('btnDelPreset').onclick=()=>{ const i=$('selPreset').value; if(i===''||!state.presets[i]) return; if(!confirm(`Delete "${state.presets[i].name}"?`)) return; state.presets.splice(i,1); save(); renderPresets(); };
+
+  // messages
+  $('btnMsgShow').onclick=()=>showMessage($('msgText').value);
+  $('btnMsgSave').onclick=()=>{ const t=$('msgText').value.trim(); if(!t) return; state.messages.push(t); save(); renderMessages(); $('msgText').value=''; };
+  $('msgList').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const i=+b.closest('.item').dataset.i;
+    if(b.dataset.act==='show') showMessage(state.messages[i]);
+    if(b.dataset.act==='edit'){ $('msgText').value=state.messages[i]; state.messages.splice(i,1); save(); renderMessages(); $('msgText').focus(); }
+    if(b.dataset.act==='del'){ state.messages.splice(i,1); save(); renderMessages(); } };
+
+  // media library
+  $('btnAddMedia').onclick=()=>$('fileMedia').click();
+  $('fileMedia').onchange=async e=>{ for(const f of e.target.files) await addMediaFile(f,{library:true}); e.target.value=''; renderMediaList(); toast('Added'); };
+  $('mediaList').onclick=async e=>{ const b=e.target.closest('button,input'); if(!b) return; const id=b.closest('.item').dataset.id; const m=media.find(x=>x.id===id);
+    if(b.dataset.act==='reel'){ m.reel=b.checked; await dbPut('media',m); renderMediaList(); return; }
+    if(b.dataset.act==='play') playMedia(m,S_().loop);
+    if(b.dataset.act==='del'){ if(!confirm(`Remove "${m.name}"?`)) return; if(current&&current.item&&current.item.id===id) backToScores(); await removeMedia(id); renderMediaList(); }
+    if(b.dataset.act==='up'){ const list=libList(); const i=list.indexOf(m); if(i>0){ const o=list[i-1].order; list[i-1].order=m.order; m.order=o; await dbPut('media',list[i-1]); await dbPut('media',m); renderMediaList(); } }
+  };
+  $('btnReel').onclick=toggleReel;
+
+  // sponsors
+  $('btnAddSponsor').onclick=()=>$('fileSponsor').click();
+  $('fileSponsor').onchange=async e=>{ for(const f of e.target.files) await addMediaFile(f,{sponsor:true}); e.target.value=''; renderSponsors(); renderAll(); };
+  $('sponsorGrid').onclick=async e=>{ const b=e.target.closest('button'); if(!b) return; const id=b.closest('.sp').dataset.id; const m=media.find(x=>x.id===id);
+    if(b.dataset.act==='del'){ await removeMedia(id); }
+    if(b.dataset.act==='left'){ const l=sponsorList(); const i=l.indexOf(m); if(i>0){ const o=l[i-1].order; l[i-1].order=m.order; m.order=o; await dbPut('media',l[i-1]); await dbPut('media',m); } }
+    renderSponsors(); renderAll(); };
+
+  // teams editor
+  $('btnAddTeam').onclick=async()=>{ const t={id:uid(),name:'NEW TEAM',colour:'#2f7df6',textColour:'#ffffff',logoId:null,tryAnimId:null}; teams.push(t); await dbPut('teams',t); renderTeamEditor(); renderTeamSelects(); };
+  $('teamList').addEventListener('input',async e=>{ const f=e.target.dataset.f; if(!f) return; const t=teams.find(x=>x.id===e.target.closest('.teamEdit').dataset.id); t[f]=e.target.value; await dbPut('teams',t); renderTeamSelects(); renderAll(); });
+  $('teamList').onclick=async e=>{ const b=e.target.closest('button'); if(!b) return; const t=teams.find(x=>x.id===b.closest('.teamEdit').dataset.id);
+    if(b.dataset.act==='logo'){ const [f]=await pickFile('image/*'); if(!f) return; if(t.logoId) await removeMedia(t.logoId); t.logoId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
+    if(b.dataset.act==='anim'){ const [f]=await pickFile('video/*'); if(!f) return; if(t.tryAnimId) await removeMedia(t.tryAnimId); t.tryAnimId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
+    if(b.dataset.act==='testanim'){ playMedia(media.find(m=>m.id===t.tryAnimId),false); return; }
+    if(b.dataset.act==='del'){ if(!confirm(`Delete ${t.name}?`)) return; if(t.logoId) await removeMedia(t.logoId); if(t.tryAnimId) await removeMedia(t.tryAnimId); teams=teams.filter(x=>x!==t); await dbDel('teams',t.id);
+      for(const s of ['home','away']) if(state[s].teamId===t.id) state[s].teamId=null; save(); }
+    renderTeamEditor(); renderTeamSelects(); renderAll(); };
+
+  // settings inputs
+  const bindSet=(id,key,num)=>{ const el=$(id); const prop=el.type==='checkbox'?'checked':'value'; el[prop]=S_()[key];
+    el.addEventListener(prop==='checked'?'change':'input',()=>{ let v=el[prop]; if(num){ v=parseInt(v,10); if(isNaN(v)) return; } S_()[key]=v; save(); renderAll(); }); };
+  bindSet('setBg','bg'); bindSet('setFont','font'); bindSet('setScoreCol','scoreCol'); bindSet('setClockCol','clockCol'); bindSet('setMsgCol','msgCol');
+  bindSet('setW','w',1); bindSet('setH','h',1); bindSet('setX','x',1); bindSet('setY','y',1);
+  bindSet('setTest','test'); bindSet('setMirror','mirror');
+  bindSet('setKickoff','kickoff'); bindSet('setHalfLen','halfLen',1); bindSet('setBinMins','binMins',1);
+  bindSet('setSponsorSecs','sponsorSecs',1); bindSet('setReelGap','reelGap',1); bindSet('setReelImg','reelImg',1);
+  $('btnBgImg').onclick=()=>$('fileBg').click();
+  $('fileBg').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; if(S_().bgImageId) await removeMedia(S_().bgImageId); S_().bgImageId=(await addMediaFile(f,{})).id; save(); renderAll(); e.target.value=''; };
+  $('btnBgClear').onclick=async()=>{ if(S_().bgImageId) await removeMedia(S_().bgImageId); S_().bgImageId=null; save(); renderAll(); };
+
+  document.addEventListener('keydown',onKey);
+  // after picking from a dropdown or ticking a box, hand the keys back to the shortcuts
+  document.addEventListener('change',e=>{ const t=e.target; if(t.tagName==='SELECT'||t.type==='checkbox'||t.type==='color') setTimeout(()=>t.blur(),0); });
+  window.addEventListener('resize',layoutPreview);
+  if(!API) window.addEventListener('beforeunload',e=>{ if(outOpen()){ e.preventDefault(); e.returnValue=''; } });
+  document.addEventListener('visibilitychange',keepAwake);
+}
+
+/* ---------- keyboard / number pad ---------- */
+const KEYMAP = {
+  KeyQ:()=>addPoints('home',5,'Try'), Numpad7:()=>addPoints('home',5,'Try'),
+  KeyW:()=>addPoints('home',2,'Conversion'), Numpad8:()=>addPoints('home',2,'Conversion'),
+  KeyE:()=>addPoints('home',3,'Penalty'), Numpad9:()=>addPoints('home',3,'Penalty'),
+  KeyR:()=>addPoints('home',3,'Drop goal'), Numpad1:()=>addPoints('home',3,'Drop goal'),
+  KeyU:()=>addPoints('away',5,'Try'), Numpad4:()=>addPoints('away',5,'Try'),
+  KeyI:()=>addPoints('away',2,'Conversion'), Numpad5:()=>addPoints('away',2,'Conversion'),
+  KeyO:()=>addPoints('away',3,'Penalty'), Numpad6:()=>addPoints('away',3,'Penalty'),
+  KeyP:()=>addPoints('away',3,'Drop goal'), Numpad3:()=>addPoints('away',3,'Drop goal'),
+  KeyT:()=>addBin('home'), NumpadDivide:()=>addBin('home'),
+  KeyY:()=>addBin('away'), NumpadMultiply:()=>addBin('away'),
+  KeyZ:undo, Numpad2:undo,
+  Space:clockToggle, Numpad0:clockToggle,
+  Escape:()=>backToScores(), NumpadDecimal:()=>backToScores(),
+  NumpadAdd:toggleReel,
+};
+function onKey(e){
+  if(e.metaKey||e.ctrlKey||e.altKey||e.repeat) return;
+  if(API && S_().globalKeys && e.code.startsWith('Numpad')) return;   // handled by the app's global number-pad keys
+  const tag=(e.target.tagName||'').toLowerCase(), typ=(e.target.type||'').toLowerCase();
+  const typing = tag==='textarea' || (tag==='input' && ['text','number','time','search','email',''].includes(typ));
+  if(e.target.ownerDocument===document && typing && e.code!=='Escape') return;
+  if(e.code==='Escape' && e.target.ownerDocument!==document) return; // Esc in the output window just leaves full screen
+  let fn=KEYMAP[e.code];
+  const f=e.code.match(/^F([1-9])$/);
+  if(f){ const m=libList()[+f[1]-1]; fn=m?()=>playMedia(m,S_().loop):null; }
+  if(fn){ e.preventDefault(); if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); fn(); }
+}
+
+/* ---------- keep the computer awake ---------- */
+let wakeLock=null;
+async function keepAwake(){
+  if(API){ $('wakeStatus').textContent='on – built into the app'; return; }
+  if(!('wakeLock' in navigator)){ $('wakeStatus').textContent='not available in this browser – set the computer to never sleep while plugged in'; return; }
+  if(wakeLock || document.visibilityState!=='visible') return;
+  try{ wakeLock=await navigator.wakeLock.request('screen'); $('wakeStatus').textContent='on (screen won\'t sleep while this is open)';
+       wakeLock.addEventListener('release',()=>{ wakeLock=null; $('wakeStatus').textContent='paused'; }); }
+  catch(e){ $('wakeStatus').textContent='not available – set the computer to never sleep while plugged in'; }
+}
+
+/* ---------- ticking ---------- */
+setInterval(()=>{
+  const ct=fmtClock(clockMs()); document.querySelectorAll('[data-clock]').forEach(e=>{ if(e.textContent!==ct) e.textContent=ct; });
+  for(const s of stages()){ s.renderClock(); s.renderCentre(false); }
+  tickBins(); checkClockAlert();
+  if(current && current.el && current.el.duration){ document.querySelector('#progress div').style.width=(100*current.el.currentTime/current.el.duration)+'%'; }
+}, 250);
+setInterval(()=>{ if(outWin && outWin.closed) dropOutput(); layoutOutput(); checkOutput(); keepAwake(); }, 1000);
+setInterval(()=>{ if(state.clock.running) save(); }, 5000);
+
+/* ---------- start ---------- */
+if(/Win/i.test(navigator.platform||navigator.userAgent)) document.body.classList.add('is-win');
+(async function init(){
+  try{ db=await idb(); teams=await dbAll('teams'); media=await dbAll('media'); }
+  catch(e){ db=null; setAlert('storage','This browser won\'t save your teams and files between sessions. Use Google Chrome.','warn'); }
+  previewStage=new Stage($('previewWrap'),{audible:true});
+  if(API){ try{ clubs=await API.clubs(); }catch(e){ clubs=[]; } }
+  if(!teams.length && !clubs.length){
+    const a={id:uid(),name:'HOME',colour:'#c8102e',textColour:'#ffffff',logoId:null,tryAnimId:null};
+    const b={id:uid(),name:'AWAY',colour:'#1f4fa3',textColour:'#ffffff',logoId:null,tryAnimId:null};
+    teams=[a,b]; await dbPut('teams',a); await dbPut('teams',b);
+    state.home.teamId=a.id; state.away.teamId=b.id; save();
+  }
+  if(API){ document.body.classList.add('is-app'); $('clubAddRow').style.display=''; }
+  wire(); renderTeamSelects(); renderTeamEditor(); renderMediaList(); renderSponsors(); renderMessages(); renderPresets();
+  renderAll(); updateOutStatus(); updateNP(); keepAwake();
+  setView(state.view==='easy'?'easy':'full');
+  if(API) initApp();
+})();
+
+/* ---------- desktop app: automatic scoreboard connection ---------- */
+function renderDisplays(info){
+  appTarget=info.target;
+  const sel=$('setDisplay');
+  sel.innerHTML='<option value="auto">Automatic (first screen that isn\'t the laptop)</option>'+info.displays.map(d=>`<option value="${d.id}">${esc(d.label)} – ${d.width}×${d.height}${d.primary?' (main screen)':''}</option>`).join('');
+  sel.value = info.displays.some(d=>String(d.id)===String(S_().displayId)) ? String(S_().displayId) : 'auto';
+  checkOutput();
+}
+async function reopenOutput(){ if(outOpen()){ try{ outWin.close(); }catch(e){} dropOutput(); } await new Promise(r=>setTimeout(r,400)); openOutput(); }
+async function initApp(){
+  let info=await API.setTarget(S_().displayId||'auto');
+  renderDisplays(info);
+  if(info.target) openOutput();
+  API.onDisplays(i=>{
+    renderDisplays(i);
+    if(practicing) return;
+    if(i.target && !outOpen()){ setTimeout(()=>{ if(!outOpen()) openOutput(); toast('Scoreboard connected'); },1200); }
+    if(!i.target && outOpen()){ try{ outWin.close(); }catch(e){} dropOutput(); toast('Scoreboard disconnected'); }
+  });
+  API.onGlobalKey(code=>{ const fn=KEYMAP[code]; if(fn) fn(); });
+  API.globalKeys(!!S_().globalKeys);
+  $('setGlobalKeys').checked=!!S_().globalKeys;
+  $('setGlobalKeys').onchange=e=>{ S_().globalKeys=e.target.checked; save(); API.globalKeys(e.target.checked); };
+  $('setDisplay').onchange=async e=>{ S_().displayId=e.target.value; save(); const i=await API.setTarget(e.target.value); renderDisplays(i); if(i.target && !practicing) reopenOutput(); };
+  $('btnPractice').onclick=async()=>{ practicing=true; await API.setPractice(true); reopenOutput(); };
+  $('btnSendBoard').onclick=async()=>{ practicing=false; await API.setPractice(false); const i=await API.displays(); renderDisplays(i);
+    if(i.target) reopenOutput(); else { if(outOpen()){ try{outWin.close();}catch(e){} dropOutput(); } toast('No scoreboard connected'); } };
+}
+</script>
+</body>
+</html>

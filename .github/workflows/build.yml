@@ -1,0 +1,68 @@
+# Builds the Mac and Windows apps every time something changes on the main branch,
+# then publishes them on the repository's Releases page.
+name: Build apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run dist:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Sign (ad-hoc) and zip
+        run: |
+          APP="$(ls -d dist/mac-universal/*.app | head -1)"
+          codesign --force --deep --sign - "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" Rugby-Scoreboard-Mac.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: Rugby-Scoreboard-Mac.zip
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/Rugby-Scoreboard-Windows-Setup.exe
+            dist/Rugby-Scoreboard-Windows-Portable.exe
+
+  release:
+    needs: [mac, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Rugby Scoreboard – build ${{ github.run_number }}
+          make_latest: true
+          body: |
+            **Mac:** download `Rugby-Scoreboard-Mac.zip`, unzip, drag Rugby Scoreboard into Applications.
+            **Windows:** download `Rugby-Scoreboard-Windows-Setup.exe` and run it (or use the Portable version, which needs no install).
+            See the instruction manual for first-time opening steps.
+          files: files/*

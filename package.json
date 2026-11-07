@@ -1,0 +1,40 @@
+{
+  "name": "rugby-scoreboard",
+  "productName": "Rugby Scoreboard",
+  "version": "1.0.0",
+  "description": "Simple rugby scoreboard controller for LED scoreboards",
+  "author": "Wiltshire Publications",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac dir --universal --publish never",
+    "dist:win": "electron-builder --win nsis portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.wiltshirepublications.rugbyscoreboard",
+    "productName": "Rugby Scoreboard",
+    "files": ["main.js", "preload.js", "app/**/*"],
+    "extraResources": [{ "from": "clubs", "to": "clubs" }],
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.sports",
+      "identity": null
+    },
+    "win": { "icon": "build/icon.ico" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Rugby Scoreboard",
+      "artifactName": "Rugby-Scoreboard-Windows-Setup.exe"
+    },
+    "portable": { "artifactName": "Rugby-Scoreboard-Windows-Portable.exe" }
+  }
+}
