@@ -98,6 +98,13 @@
   .evids button.on{outline:3px solid var(--accent)}
   .clockBigE{font-size:56px;font-weight:800;font-variant-numeric:tabular-nums;min-width:180px}
   #btnView{background:#3b2f6b;border-color:#5a49a3}
+  #qtBack{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
+  #qtBack.on{display:flex}
+  #qtBox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:440px;max-width:92vw}
+  #qtBox h3{margin:0 0 14px;font-size:18px}
+  #qtDrop{height:150px;border:2px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mute);cursor:pointer;background:#000 center/contain no-repeat;margin:10px 0}
+  #qtDrop.over{border-color:var(--accent)}
+  #qtName{width:100%;font-size:18px;padding:10px;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -418,6 +425,15 @@
   </div>
 </section>
 </main>
+<div id="qtBack"><div id="qtBox">
+  <h3 id="qtTitle">Add a new team</h3>
+  <label>Name on the scoreboard (keep it short)</label>
+  <input id="qtName" maxlength="16" placeholder="e.g. DEVIZES">
+  <div id="qtDrop">Click to choose a badge<br>or drag an image file here<br><span class="hint">(optional – PNG with a transparent background looks best)</span></div>
+  <div class="row"><label>Name colour</label><input type="color" id="qtCol" value="#ffffff"><div class="spacer"></div>
+    <button id="qtCancel">Cancel</button><button class="primary" id="qtSave">Add team</button></div>
+  <p class="hint" style="margin-bottom:0">The team is kept under "Your teams" for next time. You can change or delete it in Full view → Teams &amp; graphics.</p>
+</div></div>
 <div id="toast"></div>
 
 <script>
@@ -873,6 +889,43 @@ function updateNP(){
 }
 
 /* =====================================================================
+   QUICK "ADD A NEW TEAM" (for one-off opponents)
+   ===================================================================== */
+let qtSide=null, qtFile=null;
+function openQuickTeam(side){
+  qtSide=side; qtFile=null;
+  $('qtTitle').textContent=`Add a new ${side==='home'?'home':'away'} team`;
+  $('qtName').value=''; $('qtCol').value='#ffffff';
+  $('qtDrop').style.backgroundImage=''; $('qtDrop').innerHTML='Click to choose a badge<br>or drag an image file here<br><span class="hint">(optional – PNG with a transparent background looks best)</span>';
+  $('qtBack').classList.add('on'); setTimeout(()=>$('qtName').focus(),50);
+}
+function qtSetFile(f){
+  if(!f || !f.type.startsWith('image')){ toast('Please choose an image file'); return; }
+  qtFile=f; $('qtDrop').innerHTML=''; $('qtDrop').style.backgroundImage=`url("${URL.createObjectURL(f)}")`;
+}
+function closeQuickTeam(){ $('qtBack').classList.remove('on'); qtSide=null; }
+async function saveQuickTeam(){
+  const name=$('qtName').value.trim().toUpperCase();
+  if(!name){ toast('Type the team name'); $('qtName').focus(); return; }
+  const t={id:uid(),name,colour:'#2f7df6',textColour:$('qtCol').value,logoId:null,tryAnimId:null};
+  if(qtFile) t.logoId=(await addMediaFile(qtFile,{})).id;
+  teams.push(t); await dbPut('teams',t);
+  const side=qtSide; closeQuickTeam();
+  state[side].teamId=t.id; save(); renderTeamSelects(); renderTeamEditor(); renderAll();
+  toast(`${name} added as the ${side} team`);
+}
+function wireQuickTeam(){
+  $('qtCancel').onclick=closeQuickTeam;
+  $('qtSave').onclick=saveQuickTeam;
+  $('qtName').addEventListener('keydown',e=>{ if(e.key==='Enter') saveQuickTeam(); if(e.key==='Escape') closeQuickTeam(); });
+  $('qtDrop').onclick=async()=>{ const [f]=await pickFile('image/*'); if(f) qtSetFile(f); };
+  $('qtDrop').addEventListener('dragover',e=>{ e.preventDefault(); $('qtDrop').classList.add('over'); });
+  $('qtDrop').addEventListener('dragleave',()=>$('qtDrop').classList.remove('over'));
+  $('qtDrop').addEventListener('drop',e=>{ e.preventDefault(); $('qtDrop').classList.remove('over'); qtSetFile(e.dataTransfer.files[0]); });
+  $('qtBack').addEventListener('click',e=>{ if(e.target===$('qtBack')) closeQuickTeam(); });
+}
+
+/* =====================================================================
    EASY VIEW
    ===================================================================== */
 function easyStage(st){
@@ -927,7 +980,7 @@ function renderTeamSelects(){
   const clubOpts = spare.length ? `<optgroup label="Club list">${spare.map(c=>`<option value="club:${esc(c.key)}">${esc(c.name)}</option>`).join('')}</optgroup>` : '';
   document.querySelectorAll('.teamSel').forEach(sel=>{
     const side=sel.dataset.team;
-    sel.innerHTML=`<option value="">— ${side==='home'?'Home':'Away'} team —</option><optgroup label="Your teams">${teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>${clubOpts}`;
+    sel.innerHTML=`<option value="">— ${side==='home'?'Home':'Away'} team —</option><optgroup label="Your teams">${teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>${clubOpts}<option value="new">+ Add a new team…</option>`;
     sel.value=state[side].teamId||'';
   });
   if($('selClubAdd')){ $('selClubAdd').innerHTML = spare.length ? spare.map(c=>`<option value="${esc(c.key)}">${esc(c.name)}</option>`).join('') : '<option value="">(all clubs added)</option>'; }
@@ -944,6 +997,7 @@ async function importClub(c){
   teams.push(t); await dbPut('teams',t); return t;
 }
 async function chooseTeam(side,val){
+  if(val==='new'){ renderTeamSelects(); openQuickTeam(side); return; }
   if(val && val.startsWith('club:')){ const c=clubs.find(x=>x.key===val.slice(5)); if(c) val=(await importClub(c)).id; }
   state[side].teamId=val||null; save(); renderTeamSelects(); renderTeamEditor(); renderAll();
 }
@@ -1118,6 +1172,7 @@ const KEYMAP = {
 };
 function onKey(e){
   if(e.metaKey||e.ctrlKey||e.altKey||e.repeat) return;
+  if($('qtBack').classList.contains('on')) return;
   if(API && S_().globalKeys && e.code.startsWith('Numpad')) return;   // handled by the app's global number-pad keys
   const tag=(e.target.tagName||'').toLowerCase(), typ=(e.target.type||'').toLowerCase();
   const typing = tag==='textarea' || (tag==='input' && ['text','number','time','search','email',''].includes(typ));
@@ -1164,7 +1219,7 @@ if(/Win/i.test(navigator.platform||navigator.userAgent)) document.body.classList
     state.home.teamId=a.id; state.away.teamId=b.id; save();
   }
   if(API){ document.body.classList.add('is-app'); $('clubAddRow').style.display=''; }
-  wire(); renderTeamSelects(); renderTeamEditor(); renderMediaList(); renderSponsors(); renderMessages(); renderPresets();
+  wire(); wireQuickTeam(); renderTeamSelects(); renderTeamEditor(); renderMediaList(); renderSponsors(); renderMessages(); renderPresets();
   renderAll(); updateOutStatus(); updateNP(); keepAwake();
   setView(state.view==='easy'?'easy':'full');
   if(API) initApp();
