@@ -17,16 +17,16 @@ The clubs that appear in the Home/Away dropdowns live in the `clubs` folder.
 2. **Add the club:** open `clubs/clubs.csv` → click the pencil (Edit) → add a line:
 
    ```
-   club_name,board_name,badge_file,name_colour
-   Melksham RFC,MELKSHAM,melksham.png,#FFFFFF
+   club_name,board_name,badge_file,name_colour,team_colour
+   Melksham RFC,MELKSHAM,melksham.png,#FFFFFF,#265086
    ```
    - `club_name` – shown in the dropdown
    - `board_name` – shown on the scoreboard (keep it short)
    - `badge_file` – the file name you uploaded
    - `name_colour` – colour of the name on the board (leave as `#FFFFFF` for white)
+   - `team_colour` – the club's main colour, used in the try/conversion animations
 3. Click **Commit changes**. New apps appear under Releases about 10 minutes later.
 
-Remove the two "Example" lines once you've added your own clubs.
 
 ## Files
 - `app/index.html` – the scoreboard and control screens

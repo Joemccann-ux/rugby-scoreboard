@@ -82,6 +82,7 @@ function readClubs() {
     board: (r[col('board_name')] || r[col('club_name')] || '').toUpperCase(),
     badge: r[col('badge_file')] || '',
     nameColour: /^#[0-9a-f]{6}$/i.test(r[col('name_colour')] || '') ? r[col('name_colour')] : '#ffffff',
+    colour: /^#[0-9a-f]{6}$/i.test(r[col('team_colour')] || '') ? r[col('team_colour')] : '#2f7df6',
   })).filter(c => c.name).sort((a, b) => a.name.localeCompare(b.name));
 }
 

@@ -1,3 +1,64 @@
-club_name,board_name,badge_file,name_colour
-Example Home RFC,HOME,example-home.png,#FFFFFF
-Example Away RFC,AWAY,example-away.png,#FFFFFF
+club_name,board_name,badge_file,name_colour,team_colour
+Amesbury RFC,AMESBURY,amesbury.png,#FFFFFF,#CD9634
+Armed Forces Veterans,VETS,veterans.png,#FFFFFF,#BA9B43
+Avon RFC,AVON,avon.png,#FFFFFF,#C6920F
+Avonvale RFC,AVONVALE,avonvale.png,#FFFFFF,#DD393C
+Bath & Chew Valley,BATH & CHEW,bath-chewvalley.png,#FFFFFF,#0E4486
+Bath Mixed Ability,BATH M.A.,bath-mixed-ability.png,#FFFFFF,#C5B760
+Bath Rugby,BATH,bathrugby.png,#FFFFFF,#0C4285
+Bath Saracens,SARACENS,bath-saracens.png,#FFFFFF,#02027A
+Blandford RFC,BLANDFORD,blandford.png,#FFFFFF,#C81715
+Bradford on Avon RFC,BRADFORD,bradford-on-avon.png,#FFFFFF,#B83130
+Bridport RFC,BRIDPORT,bridport.png,#FFFFFF,#908820
+Buckingham Swans,BUCKINGHAM,buckingham-swans.png,#FFFFFF,#B6AD3A
+Calne RFC,CALNE,calne.png,#FFFFFF,#1D3279
+Cheltenham North,CHELT NORTH,cheltenham-north.png,#FFFFFF,#C91F23
+Chippenham RFC,CHIPPENHAM,chippenham.png,#FFFFFF,#3a4a6b
+Colerne RFC,COLERNE,colerne.png,#FFFFFF,#E7AD16
+Combe Down RFC,COMBE DOWN,combe-down.png,#FFFFFF,#DBAF01
+Corsham RFC,CORSHAM,corsham.png,#FFFFFF,#B32126
+Cotswold Lionesses,LIONESSES,cotswold-lionesses.png,#FFFFFF,#3a4a6b
+Devizes RFC,DEVIZES,devizes.png,#FFFFFF,#3a4a6b
+Dings Crusaders,DINGS,dings-crusaders.png,#FFFFFF,#4476AD
+Dorchester RFC,DORCHESTER,dorchester.png,#FFFFFF,#33B381
+Dorset & Wilts,DORSET WILTS,dorset-wilts.png,#FFFFFF,#1AB257
+Dragons Allstars,DRAGONS,dragon-allstars.png,#FFFFFF,#CDA336
+Drybrook RFC,DRYBROOK,drybrook.png,#FFFFFF,#059C4D
+Dursley RFC,DURSLEY,dursley.png,#FFFFFF,#980202
+Ellingham & Ringwood RFC,ELLINGHAM,ellingham-ringwood.png,#FFFFFF,#2A297F
+Fairford RFC,FAIRFORD,fairford.png,#FFFFFF,#098037
+Frome RFC,FROME,frome.png,#FFFFFF,#A58919
+Gloucester Hurricanes,HURRICANES,gloucester-hurricanes.png,#FFFFFF,#3a4a6b
+Hucclecote RFC,HUCCLECOTE,hucclecote.png,#FFFFFF,#BB8E21
+Kingswood Athenas,KINGSWOOD,kingswood-athenas.png,#FFFFFF,#2E8EBF
+Lytchett Minster RFC,LYTCHETT,lytchett-minster.png,#FFFFFF,#3a4a6b
+Marlborough RFC,MARLBOROUGH,marlborough.png,#FFFFFF,#F89B27
+Melksham Fawns,FAWNS,melksham-fawns.png,#FFFFFF,#E595E1
+Melksham Ladies,MELKSHAM,melksham-ladies.png,#FFFFFF,#265086
+Melksham RFC,MELKSHAM,melksham.png,#FFFFFF,#E3BA13
+Melksham Stags,STAGS,melksham-stags.png,#FFFFFF,#EEBF1F
+Midsomer Norton RFC,MIDSOMER,midsomer-norton.png,#FFFFFF,#958034
+Minety RFC,MINETY,minety.png,#FFFFFF,#41AB3C
+North Bristol RFC,N. BRISTOL,north-bristol.png,#FFFFFF,#DA4C53
+North Dorset RFC,N. DORSET,north-dorset.png,#FFFFFF,#B08D01
+Oakmeadians RFC,OAKMEADIANS,oakmeadians.png,#FFFFFF,#B69B3B
+Oldfield Old Boys,OLDFIELD,oldfield.png,#FFFFFF,#491F1E
+Oxford Harlequins,OXFORD,oxford-quins.png,#FFFFFF,#DEA915
+Pewsey Vale RFC,PEWSEY,pewsey-vale.png,#FFFFFF,#D74865
+Ravens RFC,RAVENS,ravens.png,#FFFFFF,#3C2B62
+Royal Wootton Bassett RFC,WOOTTON B.,wootton-bassett.png,#FFFFFF,#3a4a6b
+Salisbury RFC,SALISBURY,salisbury.png,#FFFFFF,#198524
+Sherborne RFC,SHERBORNE,sherborne.png,#FFFFFF,#FE0707
+Supermarine RFC,SUPERMARINE,supermarine.png,#FFFFFF,#E4D81C
+Sutton Benger RFC,SUTTON B.,sutton-benger.png,#FFFFFF,#BE1823
+Swanage RFC,SWANAGE,swanage.png,#FFFFFF,#54A4CF
+Swindon RFC,SWINDON,swindon.png,#FFFFFF,#EBD443
+Trowbridge RFC,TROWBRIDGE,trowbridge.png,#FFFFFF,#F2BD19
+Walcot RFC,WALCOT,walcot.png,#FFFFFF,#E4A72B
+Warminster RFC,WARMINSTER,warminster.png,#FFFFFF,#0A477C
+Westbury RFC,WESTBURY,westbury.png,#FFFFFF,#F2D428
+Weston-super-Mare RFC,WESTON,wsm.png,#FFFFFF,#E2B657
+Weymouth & Portland RFC,WEYMOUTH,weymouth-portland.png,#FFFFFF,#8AD0E4
+Wimborne RFC,WIMBORNE,wimborne.png,#FFFFFF,#3a4a6b
+Winscombe RFC,WINSCOMBE,winscombe.png,#FFFFFF,#C2181A
+Yeovil RFC,YEOVIL,yeovil.png,#FFFFFF,#C0161D
