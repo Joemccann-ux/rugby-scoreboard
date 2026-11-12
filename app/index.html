@@ -568,6 +568,9 @@ const STAGE_CSS = `
 .sb-test span{position:absolute;font:bold 14px Arial;color:#ff0;padding:3px}
 `;
 
+const _mctx=document.createElement('canvas').getContext('2d');
+function textW(txt, px){ const S=state.settings; _mctx.font=`900 ${px}px "${S.font}", "Arial Black", Arial, sans-serif`; return _mctx.measureText(String(txt)).width; }
+function fitPx(txt, maxW, maxH){ if(!txt) return maxH; const w=textW(txt,100); return Math.min(maxH, maxW*100/(w*1.06||1)); }
 class Stage {
   constructor(container, opts){
     this.doc = container.ownerDocument;
@@ -613,7 +616,7 @@ class Stage {
       e.name.textContent=t.name;
       e.name.style.color=t.textColour;
       const len=Math.max(1,t.name.length);
-      e.name.style.fontSize=Math.min(H*0.11, (W*0.34)/(len*0.74))+'px';
+      e.name.style.fontSize=fitPx(t.name, W*0.33, H*0.11)+'px';
       const u=t.logoId?mediaURL(t.logoId):null;
       if(u){ if(e.img.getAttribute('src')!==u) e.img.src=u; e.img.style.display=''; } else { e.img.removeAttribute('src'); e.img.style.display='none'; }
       const sc=state[s].score; e.score.textContent=sc;
@@ -637,7 +640,7 @@ class Stage {
     if(!force && sig===this.sbySig) return;
     this.sbySig=sig;
     const L=t=>t.logoId&&mediaURL(t.logoId)?`<img src="${mediaURL(t.logoId)}">`:'';
-    const fit=(txt,maxW,maxH)=>Math.min(maxH,(maxW)/(Math.max(1,txt.length)*0.72));
+    const fit=(txt,maxW,maxH)=>fitPx(txt,maxW,maxH);
     const st=S.standbyStyle;
     this.sby.style.background=S.bg;
     let html='';
@@ -666,7 +669,7 @@ class Stage {
     a.style.setProperty('--tc', t.colour||'#2f7df6'); a.style.setProperty('--tn', t.textColour||'#fff');
     a.style.setProperty('--d', (ANIM_MS[kind]/1000)+'s');
     const logo=t.logoId&&mediaURL(t.logoId);
-    const fit=(txt,maxW,maxH)=>Math.min(maxH,maxW/(Math.max(1,txt.length)*0.74));
+    const fit=(txt,maxW,maxH)=>fitPx(txt,maxW,maxH);
     if(kind==='try'){
       const word = label==='Penalty try' ? 'PENALTY TRY!' : 'TRY!';
       let sparks=''; for(let i=0;i<16;i++) sparks+=`<div class="at-spark" style="transform:rotate(${i*22.5+(i%2?8:0)}deg)"><i style="animation-delay:${0.76+(i%3)*0.03}s"></i></div>`;
@@ -752,8 +755,8 @@ class Stage {
     this.clearAll();
     const S=state.settings, W=S.w, H=S.h;
     const lines=wrapText(text, W, H);
-    const maxLen=Math.max(...lines.map(l=>l.length),1);
-    const fs=Math.min(H*0.24, (H*0.9)/(lines.length*1.12), (W*0.94)/(maxLen*0.68));
+    const widest=lines.reduce((a,l)=>textW(l,100)>textW(a,100)?l:a,'');
+    const fs=Math.min(H*0.24, (H*0.9)/(lines.length*1.12), fitPx(widest, W*0.92, 9999));
     this.over.textContent=lines.join('\n'); this.over.style.fontSize=fs+'px'; this.over.style.display='flex';
   }
   clearAll(){
@@ -774,7 +777,8 @@ function wrapText(text, W, H){
     for(let t=Math.ceil(n/L); t<=n; t++){ const w=wrapTo(t); if(w.length<=L){ lines=w; break; } }
     if(!lines) continue;
     const maxLen=Math.max(...lines.map(l=>l.length));
-    const fs=Math.min((H*0.9)/(lines.length*1.12),(W*0.94)/(maxLen*0.68));
+    const widest=lines.reduce((a,l)=>textW(l,100)>textW(a,100)?l:a,'');
+    const fs=Math.min((H*0.9)/(lines.length*1.12), fitPx(widest, W*0.92, 9999));
     if(fs>bestFs+0.5){ bestFs=fs; best=lines; }
   }
   return best;
