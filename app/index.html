@@ -370,6 +370,7 @@
   <div class="panel">
     <h2>Scoreboard look</h2>
     <div class="row" style="gap:18px;align-items:flex-end">
+      <div class="col"><label>Background style</label><select id="setBgStyle"><option value="teams">Team colours (glow from each side)</option><option value="gradient">Gradient of my colour</option><option value="plain">Plain colour</option></select></div>
       <div class="col"><label>Background colour</label><input type="color" id="setBg"></div>
       <div class="col"><label>Background image (optional)</label>
         <div class="row"><button id="btnBgImg">Choose image…</button><button id="btnBgClear">Remove</button></div>
@@ -568,6 +569,23 @@ const STAGE_CSS = `
 .sb-test span{position:absolute;font:bold 14px Arial;color:#ff0;padding:3px}
 `;
 
+function hexRgb(h){ h=String(h||'#000').replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); if(!/^[0-9a-f]{6}$/i.test(h)) return [40,60,110]; return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16)); }
+// layered background: team-colour glows from each side, top light, faint texture, dark edges
+function boardBackground(){
+  const S=state.settings;
+  const base=hexRgb(S.bg), dark=`rgb(${base.map(v=>Math.round(v*0.35)).join(',')})`;
+  const tex='repeating-linear-gradient(115deg,rgba(255,255,255,.028) 0 2px,transparent 2px 9px)';
+  const top='radial-gradient(ellipse 70% 55% at 50% -8%,rgba(255,255,255,.13),transparent 70%)';
+  const vig='radial-gradient(ellipse 85% 85% at 50% 50%,transparent 55%,rgba(0,0,0,.65) 100%)';
+  if(S.bgStyle==='plain') return S.bg;
+  if(S.bgStyle==='gradient'){
+    const lift=`rgb(${base.map(v=>Math.min(255,Math.round(v+40))).join(',')})`;
+    return `${vig},${tex},${top},radial-gradient(ellipse 90% 80% at 50% 40%,${lift} 0%,${S.bg} 45%,${dark} 100%)`;
+  }
+  const h=hexRgb(teamFor('home').colour), a=hexRgb(teamFor('away').colour);
+  const side=`linear-gradient(90deg,rgba(${h},.62) 0%,rgba(${h},.22) 26%,rgba(${h},0) 46%,rgba(${a},0) 54%,rgba(${a},.22) 74%,rgba(${a},.62) 100%)`;
+  return `${vig},${tex},${top},${side},linear-gradient(180deg,#0d1220 0%,${S.bg} 100%)`;
+}
 const _mctx=document.createElement('canvas').getContext('2d');
 function textW(txt, px){ const S=state.settings; _mctx.font=`900 ${px}px "${S.font}", "Arial Black", Arial, sans-serif`; return _mctx.measureText(String(txt)).width; }
 function fitPx(txt, maxW, maxH){ if(!txt) return maxH; const w=textW(txt,100); return Math.min(maxH, maxW*100/(w*1.06||1)); }
@@ -610,7 +628,8 @@ class Stage {
     this.el.style.fontFamily=`"${S.font}", "Arial Black", Arial, sans-serif`;
     this.el.style.background=S.bg;
     this.over.style.background=S.bg; this.over.style.color=S.msgCol;
-    this.bg.style.backgroundImage = S.bgImageId && mediaURL(S.bgImageId) ? `url("${mediaURL(S.bgImageId)}")` : 'none';
+    if(S.bgImageId && mediaURL(S.bgImageId)){ this.bg.style.background=''; this.bg.style.backgroundImage=`url("${mediaURL(S.bgImageId)}")`; this.bg.style.backgroundSize='cover'; this.bg.style.backgroundPosition='center'; }
+    else this.bg.style.background=boardBackground();
     for(const s of ['home','away']){
       const t=teamFor(s), e=this.sides[s];
       e.name.textContent=t.name;
@@ -642,7 +661,7 @@ class Stage {
     const L=t=>t.logoId&&mediaURL(t.logoId)?`<img src="${mediaURL(t.logoId)}">`:'';
     const fit=(txt,maxW,maxH)=>fitPx(txt,maxW,maxH);
     const st=S.standbyStyle;
-    this.sby.style.background=S.bg;
+    this.sby.style.background=boardBackground();
     let html='';
     if(st==='matchup'){
       html=`<div class="sby-glow" style="background:radial-gradient(circle at 18% 40%,${h.colour}66,transparent 45%),radial-gradient(circle at 82% 40%,${a.colour}66,transparent 45%)"></div>
@@ -792,7 +811,7 @@ const DEFAULT = {
   clock:{running:false,startedAt:0,baseMs:0,status:'pre'},
   view:'full', standby:false, history:[], bins:[], messages:['WELCOME','RAFFLE DRAW AT HALF TIME'], presets:[],
   settings:{w:400,h:270,x:0,y:0,bg:'#000000',bgImageId:null,font:'Arial Black',scoreCol:'#6dff9e',clockCol:'#7fd8ff',msgCol:'#ffffff',
-            showClock:true,mirror:true,test:false,autoAnim:true,kickAnim:true,loop:false,flash:true,standbyStyle:'matchup',standbyText:'',standbyImageId:null,standbyOnStart:true,
+            showClock:true,mirror:true,bgStyle:'teams',test:false,autoAnim:true,kickAnim:true,loop:false,flash:true,standbyStyle:'matchup',standbyText:'',standbyImageId:null,standbyOnStart:true,
             halfLen:40,binMins:10,kickoff:'',beep:false,
             sponsorsOn:false,sponsorSecs:15,reelGap:10,reelImg:8,autoReel:false,displayId:'auto',globalKeys:false}
 };
@@ -1654,7 +1673,7 @@ function wire(){
   // settings inputs
   const bindSet=(id,key,num)=>{ const el=$(id); const prop=el.type==='checkbox'?'checked':'value'; el[prop]=S_()[key];
     el.addEventListener(prop==='checked'?'change':'input',()=>{ let v=el[prop]; if(num){ v=parseInt(v,10); if(isNaN(v)) return; } S_()[key]=v; save(); renderAll(); }); };
-  bindSet('setBg','bg'); bindSet('setFont','font'); bindSet('setScoreCol','scoreCol'); bindSet('setClockCol','clockCol'); bindSet('setMsgCol','msgCol');
+  bindSet('setBg','bg'); bindSet('setBgStyle','bgStyle'); bindSet('setFont','font'); bindSet('setScoreCol','scoreCol'); bindSet('setClockCol','clockCol'); bindSet('setMsgCol','msgCol');
   bindSet('setW','w',1); bindSet('setH','h',1); bindSet('setX','x',1); bindSet('setY','y',1);
   bindSet('setTest','test'); bindSet('setMirror','mirror');
   bindSet('setKickoff','kickoff'); bindSet('setHalfLen','halfLen',1); bindSet('setBinMins','binMins',1);
