@@ -162,6 +162,26 @@ ipcMain.handle('asset', (_e, folder, file) => {
   return fs.existsSync(f) ? fs.readFileSync(f) : null;
 });
 ipcMain.handle('global-keys', (_e, on) => setGlobalKeys(!!on));
+const REPO = 'Joemccann-ux/rugby-scoreboard';
+function currentBuild() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'app', 'build.json'), 'utf8')).build || 0; } catch (e) { return 0; }
+}
+ipcMain.handle('check-update', async () => {
+  const current = currentBuild();
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { 'User-Agent': 'rugby-scoreboard-app', Accept: 'application/vnd.github+json' } });
+    if (!r.ok) return { current, latest: 0 };
+    const j = await r.json();
+    const latest = parseInt(String(j.tag_name || '').replace(/\D+/g, ''), 10) || 0;
+    const want = process.platform === 'darwin' ? /Mac\.zip$/ : /Windows-Setup\.exe$/;
+    const asset = (j.assets || []).find(a => want.test(a.name));
+    return { current, latest, page: j.html_url, download: asset ? asset.browser_download_url : j.html_url };
+  } catch (e) { return { current, latest: 0 }; }
+});
+ipcMain.handle('open-download', (_e, url) => {
+  if (/^https:\/\/github\.com\//.test(String(url))) shell.openExternal(url);
+  return true;
+});
 
 // ---------- start ----------
 app.whenReady().then(() => {

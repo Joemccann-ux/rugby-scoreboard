@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('sbApi', {
   badge:       (f)  => ipcRenderer.invoke('badge', f),
   asset:       (folder, f) => ipcRenderer.invoke('asset', folder, f),
   globalKeys:  (on) => ipcRenderer.invoke('global-keys', on),
+  checkUpdate: ()   => ipcRenderer.invoke('check-update'),
+  openDownload:(u)  => ipcRenderer.invoke('open-download', u),
   onDisplays:  (cb) => ipcRenderer.on('displays-changed', (_e, info) => cb(info)),
   onGlobalKey: (cb) => ipcRenderer.on('global-key', (_e, code) => cb(code)),
 });

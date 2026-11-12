@@ -122,6 +122,12 @@
   <span id="outStatus" class="pill">Scoreboard window: not open</span>
   <button class="primary" id="btnOpenOut">Open scoreboard window</button>
 </header>
+<div id="updateBar" style="display:none;position:sticky;top:53px;z-index:4;background:#173a6b;color:#dce9ff;padding:9px 16px;font-weight:600;align-items:center;gap:12px">
+  <span id="updateText">A new version of Rugby Scoreboard is available.</span>
+  <button class="primary" id="btnUpdate">Download update</button>
+  <button id="btnUpdateLater">Later</button>
+  <span class="hint" style="color:#b9cdee">Unzip/run it and replace the old app – your teams and settings are kept.</span>
+</div>
 <div id="alerts"></div>
 
 <main>
@@ -408,6 +414,7 @@
       <li>Double-click inside it to make it full screen. (Press Esc in that window to leave full screen.)</li>
       <li>Turn on <b>Test pattern</b> below. You should see a red border right round the edge of the LED screen. If it's cut off or shifted, adjust the position and size below.</li>
     </ol>
+    <p class="hint app-only" style="display:none" id="buildInfo"></p>
     <p class="hint">Keep computer awake: <b id="wakeStatus">checking…</b> &nbsp;·&nbsp; A red warning appears at the top if the scoreboard window ends up back on your laptop screen (e.g. the HDMI cable comes out).</p>
   </div>
   <div class="panel">
@@ -1780,7 +1787,20 @@ async function loadGenericAnims(){
     try{ const b=await API.asset('videos',file); if(b){ S_()[key]=(await addMediaFile(new File([b],file,{type:'video/mp4'}),{})).id; save(); } }catch(e){}
   }
 }
+async function checkForUpdate(){
+  try{
+    const u=await API.checkUpdate();
+    if(u.current) { $('buildInfo').style.display='block'; $('buildInfo').textContent=`Version: build ${u.current}`+(u.latest>u.current?` (build ${u.latest} available)`:' (up to date)'); }
+    if(u.current && u.latest>u.current){
+      $('updateText').textContent=`A new version of Rugby Scoreboard is available (build ${u.latest} – you have build ${u.current}).`;
+      $('updateBar').style.display='flex';
+      $('btnUpdate').onclick=()=>{ API.openDownload(u.download); $('updateBar').style.display='none'; };
+      $('btnUpdateLater').onclick=()=>{ $('updateBar').style.display='none'; };
+    }
+  }catch(e){}
+}
 async function initApp(){
+  checkForUpdate();
   let info=await API.setTarget(S_().displayId||'auto');
   renderDisplays(info);
   if(info.target) openOutput();

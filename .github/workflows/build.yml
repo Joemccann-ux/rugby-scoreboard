@@ -18,6 +18,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Stamp build number
+        shell: bash
+        run: echo '{"build": ${{ github.run_number }}}' > app/build.json
       - run: npm install
       - run: npm run dist:mac
         env:
@@ -39,6 +42,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Stamp build number
+        shell: bash
+        run: echo '{"build": ${{ github.run_number }}}' > app/build.json
       - run: npm install
       - run: npm run dist:win
       - uses: actions/upload-artifact@v4
