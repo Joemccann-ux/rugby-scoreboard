@@ -26,7 +26,7 @@ The clubs that appear in the Home/Away dropdowns live in the `clubs` folder.
    - `name_colour` – colour of the name on the board (leave as `#FFFFFF` for white)
    - `team_colour` – the club's main colour
    - `try_video` / `conversion_video` – optional MP4s in `clubs/videos` that play when that club scores
-     (clubs without their own use `generic-try.mp4` / `generic-conversion.mp4`)
+     (clubs without their own get the same animations drawn live in the app, using their badge, colour and name)
    - `sponsors` – optional sponsor logos in `clubs/sponsors` (separate several with `;`), shown under the
      clock only when that club is the home team
    - `home_club` – a number (1, 2, 3…) puts the club in the group at the top of the dropdowns, in that order
