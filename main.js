@@ -83,6 +83,7 @@ function readClubs() {
     badge: r[col('badge_file')] || '',
     nameColour: /^#[0-9a-f]{6}$/i.test(r[col('name_colour')] || '') ? r[col('name_colour')] : '#ffffff',
     colour: /^#[0-9a-f]{6}$/i.test(r[col('team_colour')] || '') ? r[col('team_colour')] : '#2f7df6',
+    home: parseInt(r[col('home_club')], 10) || (/^(y|yes|true)$/i.test(r[col('home_club')] || '') ? 99 : 0),
     tryVideo: r[col('try_video')] || '',
     convVideo: r[col('conversion_video')] || '',
     sponsors: (r[col('sponsors')] || '').split(/[;|]/).map(x => x.trim()).filter(Boolean),

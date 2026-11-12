@@ -1161,11 +1161,16 @@ function layoutPreview(){ const w=$('previewWrap').clientWidth||400, S=S_(); pre
 
 function renderTeamSelects(){
   const used=new Set(teams.map(t=>t.clubKey).filter(Boolean));
-  const spare=clubs.filter(c=>!used.has(c.key));
+  const homeKeys=new Set(clubs.filter(c=>c.home).map(c=>c.key));
+  const spare=clubs.filter(c=>!used.has(c.key) && !c.home);
+  // the home club's own teams sit in their own group at the top, whether or not they've been picked before
+  const homeOpts=clubs.filter(c=>c.home).sort((a,b)=>a.home-b.home).map(c=>{ const t=teams.find(x=>x.clubKey===c.key); return `<option value="${t?t.id:'club:'+esc(c.key)}">${esc(c.name)}</option>`; }).join('');
+  const homeGroup = homeOpts ? `<optgroup label="${esc((clubs.find(c=>c.home).name||'').split(' ')[0])} teams">${homeOpts}</optgroup>` : '';
+  const yours = teams.filter(t=>!homeKeys.has(t.clubKey));
   const clubOpts = spare.length ? `<optgroup label="Club list">${spare.map(c=>`<option value="club:${esc(c.key)}">${esc(c.name)}</option>`).join('')}</optgroup>` : '';
   document.querySelectorAll('.teamSel').forEach(sel=>{
     const side=sel.dataset.team;
-    sel.innerHTML=`<option value="">— ${side==='home'?'Home':'Away'} team —</option><optgroup label="Your teams">${teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>${clubOpts}<option value="new">+ Add a new team…</option>`;
+    sel.innerHTML=`<option value="">— ${side==='home'?'Home':'Away'} team —</option>${homeGroup}${yours.length?`<optgroup label="Your teams">${yours.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>`:''}${clubOpts}<option value="new">+ Add a new team…</option>`;
     sel.value=state[side].teamId||'';
   });
   if($('selClubAdd')){ $('selClubAdd').innerHTML = spare.length ? spare.map(c=>`<option value="${esc(c.key)}">${esc(c.name)}</option>`).join('') : '<option value="">(all clubs added)</option>'; }

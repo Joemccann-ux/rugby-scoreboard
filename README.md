@@ -29,6 +29,7 @@ The clubs that appear in the Home/Away dropdowns live in the `clubs` folder.
      (clubs without their own use `generic-try.mp4` / `generic-conversion.mp4`)
    - `sponsors` – optional sponsor logos in `clubs/sponsors` (separate several with `;`), shown under the
      clock only when that club is the home team
+   - `home_club` – a number (1, 2, 3…) puts the club in the group at the top of the dropdowns, in that order
 3. Click **Commit changes**. New apps appear under Releases about 10 minutes later.
 
 
