@@ -246,7 +246,7 @@
           <span class="hint" id="lastAction" data-last></span>
           <div class="spacer"></div>
           <label><input type="checkbox" id="chkAutoAnim"> Try animation</label>
-          <label><input type="checkbox" id="chkKickAnim"> Conversion/penalty/drop goal animation</label>
+          <label><input type="checkbox" id="chkKickAnim"> Conversion animation</label>
           <label><input type="checkbox" id="chkFlash"> Flash score when it changes</label>
           <label><input type="checkbox" id="chkSponsors"> Rotate sponsor logos under clock</label>
         </div>
@@ -353,7 +353,7 @@
       <button id="btnAddSponsor">+ Add sponsor logos</button>
       <input type="file" id="fileSponsor" accept="image/*" multiple hidden>
       <div class="col"><label>Change every (sec)</label><input type="number" id="setSponsorSecs" min="3" max="120"></div>
-      <span class="hint">PNGs with transparent backgrounds look best. They hide while a sin bin timer is showing.</span>
+      <span class="hint">PNGs with transparent backgrounds look best. They hide while a sin bin timer is showing. Logos outlined in blue belong to one club and only show when that club is the home team.</span>
     </div>
   </div>
   <div class="panel">
@@ -805,12 +805,12 @@ const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
 function mediaURL(id){ if(!id) return null; if(urlCache[id]) return urlCache[id]; const m=media.find(x=>x.id===id); if(!m) return null; return urlCache[id]=URL.createObjectURL(m.blob); }
 async function addMediaFile(file, opts){
   const kind = file.type.startsWith('video')?'video':'image';
-  const m={id:uid(),name:file.name.replace(/\.[^.]+$/,''),kind,blob:file,inLibrary:!!opts.library,sponsor:!!opts.sponsor,reel:false,order:Date.now()+Math.random()};
+  const m={id:uid(),name:file.name.replace(/\.[^.]+$/,''),kind,blob:file,inLibrary:!!opts.library,sponsor:!!opts.sponsor,teamId:opts.teamId||null,reel:false,order:Date.now()+Math.random()};
   media.push(m); await dbPut('media',m); return m;
 }
 async function removeMedia(id){ media=media.filter(m=>m.id!==id); if(urlCache[id]){URL.revokeObjectURL(urlCache[id]); delete urlCache[id];} await dbDel('media',id); }
 const libList = () => media.filter(m=>m.inLibrary).sort((a,b)=>a.order-b.order);
-const sponsorList = () => media.filter(m=>m.sponsor).sort((a,b)=>a.order-b.order);
+const sponsorList = () => media.filter(m=>m.sponsor && (!m.teamId || m.teamId===state.home.teamId)).sort((a,b)=>a.order-b.order);
 
 function teamFor(side){
   return teams.find(t=>t.id===state[side].teamId) || {name:side==='home'?'HOME':'AWAY',colour:side==='home'?'#c8102e':'#1f4fa3',textColour:'#ffffff',logoId:null,tryAnimId:null};
@@ -901,15 +901,22 @@ function addPoints(side,pts,lbl){
   setLast(`${t}: ${lbl} (${pts>0?'+':''}${pts})`);
   toast(`${t} ${lbl} ${pts>0?'+':''}${pts}`);
   if((lbl==='Try'||lbl==='Penalty try') && S_().autoAnim) playTryAnim(side, true, lbl, pts);
-  else if(['Conversion','Penalty','Drop goal'].includes(lbl) && S_().kickAnim) playAnim('kick', side, lbl, pts);
+  else if(lbl==='Conversion' && S_().kickAnim) playConvAnim(side);
 }
 function undo(){ const h=state.history.pop(); if(!h){toast('Nothing to undo');return;} state[h.side].score-=h.pts; save(); renderAll(); setLast(`Undid: ${teamFor(h.side).name} ${h.lbl}`); toast('Undone'); }
 const ANIM_MS={try:4800,kick:4000};
 let animTimer=null;
-function playTryAnim(side, quiet, label='Try', pts=5){
-  const t=teamFor(side); const m=t.tryAnimId && media.find(x=>x.id===t.tryAnimId);
-  if(m) playMedia(m,false); else playAnim('try', side, label, pts);
+function animVideo(side, kind){
+  const t=teamFor(side);
+  const own = media.find(x=>x.id===(kind==='try'?t.tryAnimId:t.convAnimId));
+  const gen = media.find(x=>x.id===(kind==='try'?S_().genericTryId:S_().genericConvId));
+  return own || gen || null;
 }
+function playTryAnim(side, quiet, label='Try', pts=5){
+  const m=animVideo(side,'try');
+  if(m) playMedia(m,false); else if(!quiet) toast(`No try animation set for ${teamFor(side).name}`);
+}
+function playConvAnim(side){ const m=animVideo(side,'conv'); if(m) playMedia(m,false); }
 function playAnim(kind, side, label, pts){
   stopReel();
   const t=teamFor(side);
@@ -1172,12 +1179,18 @@ async function importClub(c){
          t.logoId=(await addMediaFile(new File([bytes],c.badge,{type}),{})).id; }
     catch(e){ toast(`Badge file not found for ${c.name}`); }
   }
-  teams.push(t); await dbPut('teams',t); return t;
+  if(API){
+    const load=async(folder,file,type)=>{ if(!file) return null; try{ const b=await API.asset(folder,file); return b? new File([b],file,{type}) : null; }catch(e){ return null; } };
+    const tv=await load('videos',c.tryVideo,'video/mp4'); if(tv) t.tryAnimId=(await addMediaFile(tv,{})).id;
+    const cv=await load('videos',c.convVideo,'video/mp4'); if(cv) t.convAnimId=(await addMediaFile(cv,{})).id;
+    for(const sp of (c.sponsors||[])){ const f=await load('sponsors',sp,'image/png'); if(f) await addMediaFile(f,{sponsor:true,teamId:t.id}); }
+  }
+  teams.push(t); await dbPut('teams',t); renderSponsors(); return t;
 }
 async function chooseTeam(side,val){
   if(val==='new'){ renderTeamSelects(); openQuickTeam(side); return; }
   if(val && val.startsWith('club:')){ const c=clubs.find(x=>x.key===val.slice(5)); if(c) val=(await importClub(c)).id; }
-  state[side].teamId=val||null; save(); renderTeamSelects(); renderTeamEditor(); renderAll();
+  state[side].teamId=val||null; save(); renderTeamSelects(); renderTeamEditor(); renderAll(); renderSponsors();
 }
 function renderMediaList(){
   const list=libList(), box=$('mediaList');
@@ -1206,7 +1219,7 @@ function renderTeamEditor(){
   const box=$('teamList');
   if(!teams.length){ box.innerHTML='<p class="hint">No teams yet.</p>'; return; }
   box.innerHTML=teams.map(t=>{
-    const logo=t.logoId?mediaURL(t.logoId):null, anim=t.tryAnimId&&media.find(m=>m.id===t.tryAnimId);
+    const logo=t.logoId?mediaURL(t.logoId):null, anim=t.tryAnimId&&media.find(m=>m.id===t.tryAnimId), conv=t.convAnimId&&media.find(m=>m.id===t.convAnimId);
     return `<div class="teamEdit" data-id="${t.id}">
       <div class="logo" style="${logo?`background-image:url('${logo}')`:''}"></div>
       <div class="fields">
@@ -1215,12 +1228,13 @@ function renderTeamEditor(){
         <div class="col"><label>Team colour (animations)</label><input type="color" data-f="colour" value="${t.colour}"></div>
         <div class="col"><label>Logo</label><button data-act="logo">${logo?'Change logo':'Add logo'}</button></div>
         <div class="col"><label>Try animation</label><div class="row"><button data-act="anim">${anim?'Change':'Add'} video</button>${anim?`<span class="hint">${esc(anim.name)}</span> <button data-act="testanim" title="Preview">▶</button>`:''}</div></div>
+        <div class="col"><label>Conversion animation</label><div class="row"><button data-act="conv">${conv?'Change':'Add'} video</button>${conv?`<span class="hint">${esc(conv.name)}</span> <button data-act="testconv" title="Preview">▶</button>`:''}</div></div>
       </div>
       <button class="bad" data-act="del">Delete</button></div>`; }).join('');
 }
 function renderSponsors(){
-  const sp=sponsorList();
-  $('sponsorGrid').innerHTML = sp.length ? sp.map(m=>`<div class="sp" data-id="${m.id}" style="background-image:url('${mediaURL(m.id)}')"><button class="l" data-act="left" title="Move earlier">←</button><button class="x" data-act="del" title="Remove">✕</button></div>`).join('')
+  const all=media.filter(m=>m.sponsor).sort((a,b)=>a.order-b.order);
+  $('sponsorGrid').innerHTML = all.length ? all.map(m=>`<div class="sp" data-id="${m.id}" title="${m.teamId?'Shown when '+esc((teams.find(t=>t.id===m.teamId)||{}).name||'')+' are at home':'Shown at every match'}" style="background-image:url('${mediaURL(m.id)}');${m.teamId?'outline:2px solid var(--accent)':''}"><button class="l" data-act="left" title="Move earlier">←</button><button class="x" data-act="del" title="Remove">✕</button></div>`).join('')
                                          : '<span class="hint">No sponsor logos yet.</span>';
 }
 function renderMessages(){
@@ -1315,7 +1329,10 @@ function wire(){
     if(b.dataset.act==='logo'){ const [f]=await pickFile('image/*'); if(!f) return; if(t.logoId) await removeMedia(t.logoId); t.logoId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
     if(b.dataset.act==='anim'){ const [f]=await pickFile('video/*'); if(!f) return; if(t.tryAnimId) await removeMedia(t.tryAnimId); t.tryAnimId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
     if(b.dataset.act==='testanim'){ playMedia(media.find(m=>m.id===t.tryAnimId),false); return; }
-    if(b.dataset.act==='del'){ if(!confirm(`Delete ${t.name}?`)) return; if(t.logoId) await removeMedia(t.logoId); if(t.tryAnimId) await removeMedia(t.tryAnimId); teams=teams.filter(x=>x!==t); await dbDel('teams',t.id);
+    if(b.dataset.act==='conv'){ const [f]=await pickFile('video/*'); if(!f) return; if(t.convAnimId) await removeMedia(t.convAnimId); t.convAnimId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
+    if(b.dataset.act==='testconv'){ playMedia(media.find(m=>m.id===t.convAnimId),false); return; }
+    if(b.dataset.act==='del'){ if(!confirm(`Delete ${t.name}?`)) return; if(t.logoId) await removeMedia(t.logoId); if(t.tryAnimId) await removeMedia(t.tryAnimId); if(t.convAnimId) await removeMedia(t.convAnimId);
+      for(const m of media.filter(m=>m.teamId===t.id)) await removeMedia(m.id); teams=teams.filter(x=>x!==t); await dbDel('teams',t.id);
       for(const s of ['home','away']) if(state[s].teamId===t.id) state[s].teamId=null; save(); }
     renderTeamEditor(); renderTeamSelects(); renderAll(); };
 
@@ -1422,7 +1439,14 @@ function renderDisplays(info){
   checkOutput();
 }
 async function reopenOutput(){ if(outOpen()){ try{ outWin.close(); }catch(e){} dropOutput(); } await new Promise(r=>setTimeout(r,400)); openOutput(); }
+async function loadGenericAnims(){
+  for(const [key,file] of [['genericTryId','generic-try.mp4'],['genericConvId','generic-conversion.mp4']]){
+    if(S_()[key] && media.find(m=>m.id===S_()[key])) continue;
+    try{ const b=await API.asset('videos',file); if(b){ S_()[key]=(await addMediaFile(new File([b],file,{type:'video/mp4'}),{})).id; save(); } }catch(e){}
+  }
+}
 async function initApp(){
+  loadGenericAnims();
   let info=await API.setTarget(S_().displayId||'auto');
   renderDisplays(info);
   if(info.target) openOutput();

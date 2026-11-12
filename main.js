@@ -83,6 +83,9 @@ function readClubs() {
     badge: r[col('badge_file')] || '',
     nameColour: /^#[0-9a-f]{6}$/i.test(r[col('name_colour')] || '') ? r[col('name_colour')] : '#ffffff',
     colour: /^#[0-9a-f]{6}$/i.test(r[col('team_colour')] || '') ? r[col('team_colour')] : '#2f7df6',
+    tryVideo: r[col('try_video')] || '',
+    convVideo: r[col('conversion_video')] || '',
+    sponsors: (r[col('sponsors')] || '').split(/[;|]/).map(x => x.trim()).filter(Boolean),
   })).filter(c => c.name).sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -152,6 +155,11 @@ ipcMain.handle('set-target', (_e, id) => { targetId = id || 'auto'; return displ
 ipcMain.handle('set-practice', (_e, on) => { practice = !!on; return true; });
 ipcMain.handle('clubs', () => readClubs());
 ipcMain.handle('badge', (_e, file) => fs.readFileSync(path.join(clubsDir, 'badges', path.basename(String(file)))));
+ipcMain.handle('asset', (_e, folder, file) => {
+  if (!['badges', 'videos', 'sponsors'].includes(folder)) throw new Error('bad folder');
+  const f = path.join(clubsDir, folder, path.basename(String(file)));
+  return fs.existsSync(f) ? fs.readFileSync(f) : null;
+});
 ipcMain.handle('global-keys', (_e, on) => setGlobalKeys(!!on));
 
 // ---------- start ----------

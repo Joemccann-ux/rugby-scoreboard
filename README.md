@@ -24,7 +24,11 @@ The clubs that appear in the Home/Away dropdowns live in the `clubs` folder.
    - `board_name` – shown on the scoreboard (keep it short)
    - `badge_file` – the file name you uploaded
    - `name_colour` – colour of the name on the board (leave as `#FFFFFF` for white)
-   - `team_colour` – the club's main colour, used in the try/conversion animations
+   - `team_colour` – the club's main colour
+   - `try_video` / `conversion_video` – optional MP4s in `clubs/videos` that play when that club scores
+     (clubs without their own use `generic-try.mp4` / `generic-conversion.mp4`)
+   - `sponsors` – optional sponsor logos in `clubs/sponsors` (separate several with `;`), shown under the
+     clock only when that club is the home team
 3. Click **Commit changes**. New apps appear under Releases about 10 minutes later.
 
 

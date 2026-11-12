@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('sbApi', {
   setPractice: (on) => ipcRenderer.invoke('set-practice', on),
   clubs:       ()   => ipcRenderer.invoke('clubs'),
   badge:       (f)  => ipcRenderer.invoke('badge', f),
+  asset:       (folder, f) => ipcRenderer.invoke('asset', folder, f),
   globalKeys:  (on) => ipcRenderer.invoke('global-keys', on),
   onDisplays:  (cb) => ipcRenderer.on('displays-changed', (_e, info) => cb(info)),
   onGlobalKey: (cb) => ipcRenderer.on('global-key', (_e, code) => cb(code)),
