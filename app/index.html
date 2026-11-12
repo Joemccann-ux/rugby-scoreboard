@@ -714,8 +714,9 @@ class Stage {
       return;
     }
     this.binsBox.style.display='none';
-    const sp=sponsorList();
-    if(!S.sponsorsOn || !sp.length){ this.spons.style.display='none'; this.sponsIdx=-1; return; }
+    // a club's own sponsor shows all game automatically; general sponsors only when the tick box is on
+    const sp=sponsorList().filter(m=>m.teamId || S.sponsorsOn);
+    if(!sp.length){ this.spons.style.display='none'; this.sponsIdx=-1; return; }
     this.spons.style.display='';
     const idx=Math.floor(Date.now()/(Math.max(3,S.sponsorSecs)*1000))%sp.length;
     if(idx!==this.sponsIdx || force){
