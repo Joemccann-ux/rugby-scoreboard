@@ -106,6 +106,16 @@
   #qtDrop{height:150px;border:2px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mute);cursor:pointer;background:#000 center/contain no-repeat;margin:10px 0}
   #qtDrop.over{border-color:var(--accent)}
   #qtName{width:100%;font-size:18px;padding:10px;text-transform:uppercase}
+  #bgBack{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:30}
+  #bgBack.on{display:flex}
+  #bgBox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:620px;max-width:94vw}
+  #bgBox h3{margin:0 0 6px;font-size:18px}
+  .bgPair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+  .bgFrame{height:220px;border-radius:10px;border:1px solid var(--line);overflow:hidden;padding:12px}
+  .bgFrame.chk{background-color:#444;background-image:repeating-conic-gradient(#5a5a5a 0 25%,#3a3a3a 0 50%);background-size:18px 18px}
+  .bgFrame.blk{background:#000}
+  .bgPic{width:100%;height:100%;background-position:center;background-size:contain;background-repeat:no-repeat}
+  .bgCap{display:block;text-align:center;margin-top:6px;color:var(--mute);font-size:12px}
 </style>
 </head>
 <body>
@@ -465,6 +475,16 @@
   <div class="row"><label>Team colour</label><input type="color" id="qtTeamCol" value="#1f4fa3"><label>Name colour</label><input type="color" id="qtCol" value="#ffffff"><div class="spacer"></div>
     <button id="qtCancel">Cancel</button><button class="primary" id="qtSave">Add team</button></div>
   <p class="hint" style="margin-bottom:0">The team is kept under "Your teams" for next time. You can change or delete it in Full view → Teams &amp; graphics.</p>
+</div></div>
+<div id="bgBack"><div id="bgBox">
+  <h3>Background removed</h3>
+  <div class="hint">Check the badge looks right. The right-hand picture shows it on black, as it will look on the scoreboard.</div>
+  <div class="bgPair">
+    <div><div class="bgFrame chk"><div class="bgPic" id="bgOrig"></div></div><span class="bgCap">Original</span></div>
+    <div><div class="bgFrame blk"><div class="bgPic" id="bgClean"></div></div><span class="bgCap">Cleaned up – as on the scoreboard</span></div>
+  </div>
+  <label style="display:block;margin-bottom:12px;color:var(--text);font-size:13px"><input type="checkbox" id="bgWhiten"> Turn black writing white (for dark logos that vanish on black)</label>
+  <div class="row"><div class="spacer"></div><button id="bgKeep">Keep original</button><button class="primary" id="bgUse">Use cleaned up</button></div>
 </div></div>
 <div id="toast"></div>
 
@@ -1408,6 +1428,96 @@ function updateNP(){
 }
 
 /* =====================================================================
+   BADGE / LOGO CLEAN-UP ON UPLOAD
+   Removes a plain background that touches the edges (usually white),
+   leaving enclosed areas such as white inside the badge untouched,
+   then trims empty space. A before/after check is shown when the
+   background was removed.
+   ===================================================================== */
+async function cleanLogo(file){
+  const src=URL.createObjectURL(file); const img=new Image(); img.src=src;
+  try{ await img.decode(); }catch(e){ return null; }
+  let w=img.naturalWidth, h=img.naturalHeight; const sc=Math.min(1,1200/Math.max(w,h)); w=Math.max(1,Math.round(w*sc)); h=Math.max(1,Math.round(h*sc));
+  const c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext('2d'); x.drawImage(img,0,0,w,h);
+  const id=x.getImageData(0,0,w,h), d=id.data;
+  const border=[]; for(let i=0;i<w;i++){ border.push(i,(h-1)*w+i); } for(let j=1;j<h-1;j++){ border.push(j*w,j*w+w-1); }
+  let clear=0; const cols=[];
+  for(const p of border){ if(d[p*4+3]<20) clear++; else cols.push([d[p*4],d[p*4+1],d[p*4+2]]); }
+  let removed=false;
+  if(clear < border.length*0.5 && cols.length){
+    const med=[0,1,2].map(k=>cols.map(q=>q[k]).sort((a,b)=>a-b)[cols.length>>1]);
+    const dist=p=>{ const r=d[p*4]-med[0], g=d[p*4+1]-med[1], b=d[p*4+2]-med[2]; return Math.sqrt(r*r+g*g+b*b); };
+    const sameAsMed=cols.filter(q=>Math.hypot(q[0]-med[0],q[1]-med[1],q[2]-med[2])<40).length;
+    if(sameAsMed > cols.length*0.6){                     // the edge is mostly one colour: treat it as background
+      const T=44, seen=new Uint8Array(w*h), stack=[];
+      for(const p of border){ if(!seen[p] && (d[p*4+3]<20 || dist(p)<T)){ seen[p]=1; stack.push(p); } }
+      while(stack.length){
+        const p=stack.pop(); d[p*4+3]=0;
+        const px=p%w, py=(p-px)/w;
+        const nb=[px>0?p-1:-1, px<w-1?p+1:-1, py>0?p-w:-1, py<h-1?p+w:-1];
+        for(const q of nb){ if(q<0 || seen[q]) continue; seen[q]=1;
+          const dq=dist(q);
+          if(d[q*4+3]<20 || dq<T) stack.push(q);
+          else if(dq<T*2) d[q*4+3]=Math.min(d[q*4+3], Math.round(255*(dq-T)/T));   // soft edge, no halo
+        }
+      }
+      removed=true;
+    }
+  }
+  // trim empty space
+  let x0=w, y0=h, x1=-1, y1=-1;
+  for(let y=0;y<h;y++) for(let xx=0;xx<w;xx++) if(d[(y*w+xx)*4+3]>12){ if(xx<x0)x0=xx; if(xx>x1)x1=xx; if(y<y0)y0=y; if(y>y1)y1=y; }
+  if(x1<0) return null;                                    // nothing left: give up and keep the original
+  x.putImageData(id,0,0);
+  const pad=Math.round(Math.max(x1-x0,y1-y0)*0.02);
+  x0=Math.max(0,x0-pad); y0=Math.max(0,y0-pad); x1=Math.min(w-1,x1+pad); y1=Math.min(h-1,y1+pad);
+  const trimmed = x0>2 || y0>2 || x1<w-3 || y1<h-3;
+  if(!removed && !trimmed) return null;
+  const o=document.createElement('canvas'); o.width=x1-x0+1; o.height=y1-y0+1;
+  o.getContext('2d').drawImage(c,x0,y0,o.width,o.height,0,0,o.width,o.height);
+  const blob=await new Promise(r=>o.toBlob(r,'image/png'));
+  const name=file.name.replace(/\.[^.]+$/,'')+'.png';
+  return {file:new File([blob], name, {type:'image/png'}), removed, src, clean:URL.createObjectURL(blob), canvas:o, name};
+}
+// dark, grey-ish pixels become white; coloured parts are left alone
+async function whitenDark(res){
+  const c=document.createElement('canvas'); c.width=res.canvas.width; c.height=res.canvas.height;
+  const x=c.getContext('2d'); x.drawImage(res.canvas,0,0);
+  const id=x.getImageData(0,0,c.width,c.height), d=id.data;
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]<10) continue;
+    const r=d[i],g=d[i+1],b=d[i+2], mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/510, sat=mx? (mx-mn)/mx : 0;
+    if(sat<0.25 && l<0.45){ d[i]=d[i+1]=d[i+2]=255; }
+    else if(sat<0.2 && l<0.75){ const v=Math.round(185+(l-0.45)*120); d[i]=d[i+1]=d[i+2]=Math.min(235,v); }   // mid-greys become light grey
+  }
+  x.putImageData(id,0,0);
+  const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+  return {file:new File([blob],res.name,{type:'image/png'}), url:URL.createObjectURL(blob)};
+}
+function askBgChoice(res){
+  return new Promise(resolve=>{
+    let chosen=res.file, white=null;
+    $('bgOrig').style.backgroundImage=`url("${res.src}")`; $('bgClean').style.backgroundImage=`url("${res.clean}")`;
+    $('bgWhiten').checked=false;
+    $('bgWhiten').onchange=async e=>{
+      if(e.target.checked){ if(!white) white=await whitenDark(res); chosen=white.file; $('bgClean').style.backgroundImage=`url("${white.url}")`; }
+      else { chosen=res.file; $('bgClean').style.backgroundImage=`url("${res.clean}")`; }
+    };
+    $('bgBack').classList.add('on');
+    const done=v=>{ $('bgBack').classList.remove('on'); resolve(v); };
+    $('bgUse').onclick=()=>done(chosen); $('bgKeep').onclick=()=>done(null);
+  });
+}
+// every badge or sponsor logo goes through here before it's saved
+async function prepareLogo(file){
+  if(!file || !file.type.startsWith('image') || /svg/.test(file.type)) return file;
+  let res=null; try{ res=await cleanLogo(file); }catch(e){ res=null; }
+  if(!res) return file;
+  if(!res.removed) return res.file;                       // already transparent: just trimmed, no need to ask
+  return (await askBgChoice(res)) || file;
+}
+
+/* =====================================================================
    QUICK "ADD A NEW TEAM" (for one-off opponents)
    ===================================================================== */
 let qtSide=null, qtFile=null;
@@ -1418,8 +1528,9 @@ function openQuickTeam(side){
   $('qtDrop').style.backgroundImage=''; $('qtDrop').innerHTML='Click to choose a badge<br>or drag an image file here<br><span class="hint">(optional – PNG with a transparent background looks best)</span>';
   $('qtBack').classList.add('on'); setTimeout(()=>$('qtName').focus(),50);
 }
-function qtSetFile(f){
+async function qtSetFile(f){
   if(!f || !f.type.startsWith('image')){ toast('Please choose an image file'); return; }
+  f=await prepareLogo(f);
   qtFile=f; $('qtDrop').innerHTML=''; $('qtDrop').style.backgroundImage=`url("${URL.createObjectURL(f)}")`;
 }
 function closeQuickTeam(){ $('qtBack').classList.remove('on'); qtSide=null; }
@@ -1657,7 +1768,7 @@ function wire(){
 
   // sponsors
   $('btnAddSponsor').onclick=()=>$('fileSponsor').click();
-  $('fileSponsor').onchange=async e=>{ for(const f of e.target.files) await addMediaFile(f,{sponsor:true}); e.target.value=''; renderSponsors(); renderAll(); };
+  $('fileSponsor').onchange=async e=>{ const files=[...e.target.files]; e.target.value=''; for(const f of files) await addMediaFile(await prepareLogo(f),{sponsor:true}); renderSponsors(); renderAll(); };
   $('sponsorGrid').onclick=async e=>{ const b=e.target.closest('button'); if(!b) return; const id=b.closest('.sp').dataset.id; const m=media.find(x=>x.id===id);
     if(b.dataset.act==='del'){ await removeMedia(id); }
     if(b.dataset.act==='left'){ const l=sponsorList(); const i=l.indexOf(m); if(i>0){ const o=l[i-1].order; l[i-1].order=m.order; m.order=o; await dbPut('media',l[i-1]); await dbPut('media',m); } }
@@ -1667,7 +1778,7 @@ function wire(){
   $('btnAddTeam').onclick=async()=>{ const t={id:uid(),name:'NEW TEAM',colour:'#2f7df6',textColour:'#ffffff',logoId:null,tryAnimId:null}; teams.push(t); await dbPut('teams',t); renderTeamEditor(); renderTeamSelects(); };
   $('teamList').addEventListener('input',async e=>{ const f=e.target.dataset.f; if(!f) return; const t=teams.find(x=>x.id===e.target.closest('.teamEdit').dataset.id); t[f]=e.target.value; await dbPut('teams',t); renderTeamSelects(); renderAll(); });
   $('teamList').onclick=async e=>{ const b=e.target.closest('button'); if(!b) return; const t=teams.find(x=>x.id===b.closest('.teamEdit').dataset.id);
-    if(b.dataset.act==='logo'){ const [f]=await pickFile('image/*'); if(!f) return; if(t.logoId) await removeMedia(t.logoId); t.logoId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
+    if(b.dataset.act==='logo'){ let [f]=await pickFile('image/*'); if(!f) return; f=await prepareLogo(f); if(t.logoId) await removeMedia(t.logoId); t.logoId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
     if(b.dataset.act==='anim'){ const [f]=await pickFile('video/*'); if(!f) return; if(t.tryAnimId) await removeMedia(t.tryAnimId); t.tryAnimId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
     if(b.dataset.act==='testanim'){ playMedia(media.find(m=>m.id===t.tryAnimId),false); return; }
     if(b.dataset.act==='conv'){ const [f]=await pickFile('video/*'); if(!f) return; if(t.convAnimId) await removeMedia(t.convAnimId); t.convAnimId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
@@ -1717,7 +1828,7 @@ const KEYMAP = {
 };
 function onKey(e){
   if(e.metaKey||e.ctrlKey||e.altKey||e.repeat) return;
-  if($('qtBack').classList.contains('on')) return;
+  if($('qtBack').classList.contains('on') || $('bgBack').classList.contains('on')) return;
   if(API && S_().globalKeys && e.code.startsWith('Numpad')) return;   // handled by the app's global number-pad keys
   const tag=(e.target.tagName||'').toLowerCase(), typ=(e.target.type||'').toLowerCase();
   const typing = tag==='textarea' || (tag==='input' && ['text','number','time','search','email',''].includes(typ));
