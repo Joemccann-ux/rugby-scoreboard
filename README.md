@@ -29,6 +29,7 @@ The clubs that appear in the Home/Away dropdowns live in the `clubs` folder.
      (clubs without their own get the same animations drawn live in the app, using their badge, colour and name)
    - `sponsors` – optional sponsor logos in `clubs/sponsors` (separate several with `;`), shown under the
      clock only when that club is the home team
+   - `try_music` / `try_music_start` – optional song in `clubs/music` that plays with that club's try animation, and the second to start from
    - `home_club` – a number (1, 2, 3…) puts the club in the group at the top of the dropdowns, in that order
 3. Click **Commit changes**. New apps appear under Releases about 10 minutes later.
 

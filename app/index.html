@@ -374,6 +374,17 @@
     </div>
   </div>
   <div class="panel">
+    <h2>Try music</h2>
+    <p class="hint" style="margin-top:0">Each team's own try music is set in its box above ("Try music"). It plays for the length of the try animation and fades out at the end. Pressing Back to scores stops it.</p>
+    <div class="row" style="gap:18px;align-items:flex-end">
+      <div class="col"><label>Volume</label><input type="range" id="setMusicVol" min="0" max="100" style="width:180px"></div>
+      <div class="col"><label>Default music for home tries (teams without their own)</label>
+        <div class="row"><button id="btnDefMusic">Choose music…</button><span class="hint" id="defMusicName"></span>
+          <label style="margin:0">from</label><input id="setDefMusicStart" style="width:58px" placeholder="0:00">
+          <button id="btnDefMusicTest" title="Preview">▶</button><button id="btnDefMusicClear" title="Remove">✕</button></div></div>
+    </div>
+  </div>
+  <div class="panel">
     <h2>Standby screen</h2>
     <div class="row" style="gap:18px;align-items:flex-end">
       <div class="col"><label>Message on standby screen (shown when no kick-off time is set)</label><input id="setStandbyText" placeholder="e.g. WELCOME TO WESTBURY RFC" style="width:340px;text-transform:uppercase"></div>
@@ -863,7 +874,7 @@ const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
 
 function mediaURL(id){ if(!id) return null; if(urlCache[id]) return urlCache[id]; const m=media.find(x=>x.id===id); if(!m) return null; return urlCache[id]=URL.createObjectURL(m.blob); }
 async function addMediaFile(file, opts){
-  const kind = file.type.startsWith('video')?'video':'image';
+  const kind = file.type.startsWith('video')?'video' : (file.type.startsWith('audio')||/\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(file.name))?'audio' : 'image';
   const m={id:uid(),name:file.name.replace(/\.[^.]+$/,''),kind,blob:file,inLibrary:!!opts.library,sponsor:!!opts.sponsor,teamId:opts.teamId||null,reel:false,order:Date.now()+Math.random()};
   media.push(m); await dbPut('media',m); return m;
 }
@@ -1251,7 +1262,7 @@ function badgeImage(t){
 }
 let liveRun=0;
 function playLive(kind, side){
-  stopReel();
+  stopReel(); stopMusic(150);
   const t=teamFor(side);
   const master=document.createElement('canvas'); master.width=800; master.height=540;
   const mo=makeMotion(master,{kind,colour:t.colour,name:t.name},badgeImage(t));
@@ -1269,7 +1280,49 @@ function playLive(kind, side){
   };
   requestAnimationFrame(frame);
 }
-function playTryAnim(side, quiet, label='Try', pts=5){ const m=animVideo(side,'try'); if(m) playMedia(m,false); else playLive('try',side); }
+/* ---------- try music: plays for the length of the try animation, then fades out ---------- */
+let musicEl=null, musicTimer=null, musicTotalMs=5000;
+function parseTime(v){ const m=String(v||'').trim().match(/^(\d+)(?::(\d{1,2}))?$/); return m ? (m[2]!=null ? (+m[1])*60+(+m[2]) : +m[1]) : 0; }
+function fmtTime(sec){ sec=Math.max(0,Math.round(sec||0)); return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'); }
+function stopMusic(fadeMs=250){
+  const a=musicEl; if(!a) return; musicEl=null; clearInterval(musicTimer);
+  if(!fadeMs){ a.pause(); return; }
+  const v0=a.volume, t0=performance.now();
+  const iv=setInterval(()=>{ const k=(performance.now()-t0)/fadeMs; if(k>=1){ clearInterval(iv); a.pause(); } else a.volume=Math.max(0,v0*(1-k)); },30);
+}
+function playMusic(id, startSec, durMs){
+  stopMusic(0);
+  const m=id&&media.find(x=>x.id===id); if(!m) return;
+  const a=new Audio(mediaURL(m.id)), vol=Math.max(0,Math.min(1,(S_().musicVol??80)/100));
+  a.preload='auto'; a.volume=0; musicEl=a; musicTotalMs=durMs;
+  a.addEventListener('loadedmetadata',()=>{ try{ a.currentTime=Math.min(startSec||0, Math.max(0,(a.duration||0)-1)); }catch(e){} a.play().catch(()=>{}); },{once:true});
+  const t0=performance.now(), fadeIn=300, fadeOut=1200;
+  musicTimer=setInterval(()=>{
+    if(musicEl!==a){ clearInterval(musicTimer); return; }
+    const el=performance.now()-t0, total=musicTotalMs;
+    let v=vol*Math.min(1,el/fadeIn);
+    if(el>total-fadeOut) v=Math.min(v, vol*Math.max(0,(total-el)/fadeOut));
+    a.volume=Math.max(0,Math.min(1,v));
+    if(el>=total) stopMusic(0);
+  },40);
+}
+function tryMusicFor(side){
+  const t=teamFor(side);
+  if(t.tryMusicId && media.find(x=>x.id===t.tryMusicId)) return {id:t.tryMusicId, start:t.tryMusicStart||0};
+  if(side==='home' && S_().defaultTryMusicId && media.find(x=>x.id===S_().defaultTryMusicId)) return {id:S_().defaultTryMusicId, start:S_().defaultTryMusicStart||0};
+  return null;
+}
+function playTryAnim(side, quiet, label='Try', pts=5){
+  const m=animVideo(side,'try');
+  if(m) playMedia(m,false); else playLive('try',side);
+  const mus=tryMusicFor(side);
+  if(mus){
+    playMusic(mus.id, mus.start, m ? 6000 : 5000);
+    if(m && current && current.el){ const el=current.el;                      // match the music to the video's real length
+      const setLen=()=>{ if(el.duration && isFinite(el.duration)) musicTotalMs=el.duration*1000; };
+      if(el.readyState>=1) setLen(); else el.addEventListener('loadedmetadata',setLen,{once:true}); }
+  }
+}
 function playConvAnim(side){ const m=animVideo(side,'conv'); if(m) playMedia(m,false); else playLive('conversion',side); }
 function playAnim(kind, side, label, pts){
   stopReel();
@@ -1367,7 +1420,7 @@ let current=null;   // {type:'media'|'message', item, loop, el, text}
 let reel=null;      // {i, timer}
 function playMedia(item, loop, fromReel){
   if(!item) return;
-  liveRun++;
+  liveRun++; stopMusic(150);
   if(!fromReel) stopReel();
   const master = outOpen() ? outStage : previewStage;
   let masterEl=null;
@@ -1398,6 +1451,7 @@ function updateStandbyBtn(){
 }
 function backToScores(user=true){
   if(user!==false){ stopReel(); if(state.standby) setStandby(false); }
+  stopMusic(user!==false ? 400 : 150);
   for(const s of stages()) s.clearAll();
   current=null; updateNP();
 }
@@ -1635,6 +1689,7 @@ async function importClub(c){
     const load=async(folder,file,type)=>{ if(!file) return null; try{ const b=await API.asset(folder,file); return b? new File([b],file,{type}) : null; }catch(e){ return null; } };
     const tv=await load('videos',c.tryVideo,'video/mp4'); if(tv) t.tryAnimId=(await addMediaFile(tv,{})).id;
     const cv=await load('videos',c.convVideo,'video/mp4'); if(cv) t.convAnimId=(await addMediaFile(cv,{})).id;
+    const tm=await load('music',c.tryMusic,'audio/mpeg'); if(tm){ t.tryMusicId=(await addMediaFile(tm,{})).id; t.tryMusicStart=c.tryMusicStart||0; }
     for(const sp of (c.sponsors||[])){ const f=await load('sponsors',sp,'image/png'); if(f) await addMediaFile(f,{sponsor:true,teamId:t.id}); }
   }
   teams.push(t); await dbPut('teams',t); renderSponsors(); return t;
@@ -1671,7 +1726,7 @@ function renderTeamEditor(){
   const box=$('teamList');
   if(!teams.length){ box.innerHTML='<p class="hint">No teams yet.</p>'; return; }
   box.innerHTML=teams.map(t=>{
-    const logo=t.logoId?mediaURL(t.logoId):null, anim=t.tryAnimId&&media.find(m=>m.id===t.tryAnimId), conv=t.convAnimId&&media.find(m=>m.id===t.convAnimId);
+    const logo=t.logoId?mediaURL(t.logoId):null, anim=t.tryAnimId&&media.find(m=>m.id===t.tryAnimId), conv=t.convAnimId&&media.find(m=>m.id===t.convAnimId), mus=t.tryMusicId&&media.find(m=>m.id===t.tryMusicId);
     return `<div class="teamEdit" data-id="${t.id}">
       <div class="logo" style="${logo?`background-image:url('${logo}')`:''}"></div>
       <div class="fields">
@@ -1681,6 +1736,7 @@ function renderTeamEditor(){
         <div class="col"><label>Logo</label><button data-act="logo">${logo?'Change logo':'Add logo'}</button></div>
         <div class="col"><label>Try animation</label><div class="row"><button data-act="anim">${anim?'Change':'Add'} video</button>${anim?`<span class="hint">${esc(anim.name)}</span> <button data-act="testanim" title="Preview">▶</button>`:''}</div></div>
         <div class="col"><label>Conversion animation</label><div class="row"><button data-act="conv">${conv?'Change':'Add'} video</button>${conv?`<span class="hint">${esc(conv.name)}</span> <button data-act="testconv" title="Preview">▶</button>`:''}</div></div>
+        <div class="col"><label>Try music (plays with the try animation)</label><div class="row"><button data-act="music">${mus?'Change':'Add'} music</button>${mus?`<span class="hint">${esc(mus.name)}</span> <label style="margin:0">from</label><input data-mstart value="${fmtTime(t.tryMusicStart)}" style="width:58px" title="Where in the song to start, e.g. 0:35"> <button data-act="testmusic" title="Preview">▶</button><button data-act="delmusic" title="Remove music">✕</button>`:''}</div></div>
       </div>
       <button class="bad" data-act="del">Delete</button></div>`; }).join('');
 }
@@ -1719,6 +1775,14 @@ function wire(){
   document.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>easyStage(b.dataset.stage));
   document.querySelectorAll('[data-act=standby]').forEach(b=>b.onclick=()=>setStandby(!state.standby));
   document.querySelectorAll('.selStandby').forEach(sel=>sel.onchange=e=>{ S_().standbyStyle=e.target.value; save(); for(const s of stages()) s.renderStandby(true); updateStandbyBtn(); if(!state.standby) setStandby(true); });
+  $('setMusicVol').value=S_().musicVol??80;
+  $('setMusicVol').oninput=e=>{ S_().musicVol=+e.target.value; save(); };
+  const showDef=()=>{ const m=S_().defaultTryMusicId&&media.find(x=>x.id===S_().defaultTryMusicId); $('defMusicName').textContent=m?m.name:'none'; $('setDefMusicStart').value=fmtTime(S_().defaultTryMusicStart||0); };
+  showDef();
+  $('btnDefMusic').onclick=async()=>{ const [f]=await pickFile('audio/*,.mp3,.m4a,.wav,.aac'); if(!f) return; if(S_().defaultTryMusicId) await removeMedia(S_().defaultTryMusicId); S_().defaultTryMusicId=(await addMediaFile(f,{})).id; S_().defaultTryMusicStart=0; save(); showDef(); };
+  $('setDefMusicStart').onchange=e=>{ S_().defaultTryMusicStart=parseTime(e.target.value); save(); showDef(); };
+  $('btnDefMusicTest').onclick=()=>{ if(musicEl){ stopMusic(); return; } playMusic(S_().defaultTryMusicId, S_().defaultTryMusicStart||0, 5000); };
+  $('btnDefMusicClear').onclick=async()=>{ if(S_().defaultTryMusicId) await removeMedia(S_().defaultTryMusicId); S_().defaultTryMusicId=null; save(); showDef(); };
   $('setStandbyText').value=S_().standbyText||'';
   $('setStandbyText').addEventListener('input',e=>{ S_().standbyText=e.target.value.toUpperCase(); save(); for(const s of stages()) s.renderStandby(true); });
   $('setStandbyOnStart').checked=!!S_().standbyOnStart;
@@ -1776,6 +1840,8 @@ function wire(){
 
   // teams editor
   $('btnAddTeam').onclick=async()=>{ const t={id:uid(),name:'NEW TEAM',colour:'#2f7df6',textColour:'#ffffff',logoId:null,tryAnimId:null}; teams.push(t); await dbPut('teams',t); renderTeamEditor(); renderTeamSelects(); };
+  $('teamList').addEventListener('change',async e=>{ if(!e.target.hasAttribute('data-mstart')) return;
+    const t=teams.find(x=>x.id===e.target.closest('.teamEdit').dataset.id); t.tryMusicStart=parseTime(e.target.value); e.target.value=fmtTime(t.tryMusicStart); await dbPut('teams',t); });
   $('teamList').addEventListener('input',async e=>{ const f=e.target.dataset.f; if(!f) return; const t=teams.find(x=>x.id===e.target.closest('.teamEdit').dataset.id); t[f]=e.target.value; await dbPut('teams',t); renderTeamSelects(); renderAll(); });
   $('teamList').onclick=async e=>{ const b=e.target.closest('button'); if(!b) return; const t=teams.find(x=>x.id===b.closest('.teamEdit').dataset.id);
     if(b.dataset.act==='logo'){ let [f]=await pickFile('image/*'); if(!f) return; f=await prepareLogo(f); if(t.logoId) await removeMedia(t.logoId); t.logoId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
@@ -1783,7 +1849,10 @@ function wire(){
     if(b.dataset.act==='testanim'){ playMedia(media.find(m=>m.id===t.tryAnimId),false); return; }
     if(b.dataset.act==='conv'){ const [f]=await pickFile('video/*'); if(!f) return; if(t.convAnimId) await removeMedia(t.convAnimId); t.convAnimId=(await addMediaFile(f,{})).id; await dbPut('teams',t); }
     if(b.dataset.act==='testconv'){ playMedia(media.find(m=>m.id===t.convAnimId),false); return; }
-    if(b.dataset.act==='del'){ if(!confirm(`Delete ${t.name}?`)) return; if(t.logoId) await removeMedia(t.logoId); if(t.tryAnimId) await removeMedia(t.tryAnimId); if(t.convAnimId) await removeMedia(t.convAnimId);
+    if(b.dataset.act==='music'){ const [f]=await pickFile('audio/*,.mp3,.m4a,.wav,.aac'); if(!f) return; if(t.tryMusicId) await removeMedia(t.tryMusicId); t.tryMusicId=(await addMediaFile(f,{})).id; t.tryMusicStart=0; await dbPut('teams',t); }
+    if(b.dataset.act==='testmusic'){ if(musicEl){ stopMusic(); return; } playMusic(t.tryMusicId, t.tryMusicStart||0, 5000); return; }
+    if(b.dataset.act==='delmusic'){ if(t.tryMusicId) await removeMedia(t.tryMusicId); t.tryMusicId=null; await dbPut('teams',t); }
+    if(b.dataset.act==='del'){ if(!confirm(`Delete ${t.name}?`)) return; if(t.logoId) await removeMedia(t.logoId); if(t.tryAnimId) await removeMedia(t.tryAnimId); if(t.convAnimId) await removeMedia(t.convAnimId); if(t.tryMusicId) await removeMedia(t.tryMusicId);
       for(const m of media.filter(m=>m.teamId===t.id)) await removeMedia(m.id); teams=teams.filter(x=>x!==t); await dbDel('teams',t.id);
       for(const s of ['home','away']) if(state[s].teamId===t.id) state[s].teamId=null; save(); }
     renderTeamEditor(); renderTeamSelects(); renderAll(); };

@@ -86,6 +86,8 @@ function readClubs() {
     home: parseInt(r[col('home_club')], 10) || (/^(y|yes|true)$/i.test(r[col('home_club')] || '') ? 99 : 0),
     tryVideo: r[col('try_video')] || '',
     convVideo: r[col('conversion_video')] || '',
+    tryMusic: r[col('try_music')] || '',
+    tryMusicStart: parseFloat(r[col('try_music_start')]) || 0,
     sponsors: (r[col('sponsors')] || '').split(/[;|]/).map(x => x.trim()).filter(Boolean),
   })).filter(c => c.name).sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -157,7 +159,7 @@ ipcMain.handle('set-practice', (_e, on) => { practice = !!on; return true; });
 ipcMain.handle('clubs', () => readClubs());
 ipcMain.handle('badge', (_e, file) => fs.readFileSync(path.join(clubsDir, 'badges', path.basename(String(file)))));
 ipcMain.handle('asset', (_e, folder, file) => {
-  if (!['badges', 'videos', 'sponsors'].includes(folder)) throw new Error('bad folder');
+  if (!['badges', 'videos', 'sponsors', 'music'].includes(folder)) throw new Error('bad folder');
   const f = path.join(clubsDir, folder, path.basename(String(file)));
   return fs.existsSync(f) ? fs.readFileSync(f) : null;
 });
