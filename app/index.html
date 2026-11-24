@@ -116,6 +116,20 @@
   .bgFrame.blk{background:#000}
   .bgPic{width:100%;height:100%;background-position:center;background-size:contain;background-repeat:no-repeat}
   .bgCap{display:block;text-align:center;margin-top:6px;color:var(--mute);font-size:12px}
+  #phGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  #phGrid figure{margin:0;position:relative;cursor:pointer;border-radius:6px;overflow:hidden;background:#000;aspect-ratio:3/2}
+  #phGrid img{width:100%;height:100%;object-fit:contain;display:block}
+  #phGrid figure.off img{opacity:.18}
+  #phGrid figure.off::after{content:"Left out";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700}
+  #phGrid figure.now{outline:3px solid var(--good)}
+  #phGrid figcaption{position:absolute;left:4px;bottom:3px;font-size:11px;color:#fff;text-shadow:0 0 3px #000}
+  .phSrc{background:var(--panel2);border-radius:8px;padding:8px 10px;font-size:13px}
+  .phSrc .bar{height:4px;background:#333;border-radius:2px;overflow:hidden;margin-top:6px}
+  .phSrc .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  .phSrc.done .bar i{background:var(--good)}
+  .phSrc .hint{color:var(--warn)}
+  .phCard{display:flex;align-items:center;gap:10px;background:var(--panel2);border-radius:8px;padding:8px 10px}
+  .phCard b{flex:1}
 </style>
 </head>
 <body>
@@ -126,9 +140,11 @@
     <button data-tab="setup">Teams &amp; graphics</button>
     <button data-tab="display">Screen setup</button>
     <button data-tab="keys">Keys</button>
+    <button data-tab="photos" id="tabPhotos">📷 Photos</button>
   </div>
   <button id="btnView">Easy view</button>
   <div class="spacer"></div>
+  <button id="btnPhotosQuick" class="yellow" style="display:none"></button>
   <span id="outStatus" class="pill">Scoreboard window: not open</span>
   <button class="primary" id="btnOpenOut">Open scoreboard window</button>
 </header>
@@ -473,8 +489,67 @@
       <tr><td>Back to scores (stop video / message / reel)</td><td colspan="2"><kbd>Esc</kbd> or pad <kbd>.</kbd></td></tr>
       <tr><td>Play / stop the reel</td><td colspan="2">pad <kbd>+</kbd></td></tr>
       <tr><td>Show / hide standby screen</td><td colspan="2"><kbd>B</kbd> or pad <kbd>−</kbd></td></tr>
+      <tr><td>Stop post-match photos on the scoreboard</td><td colspan="2"><kbd>Esc</kbd> or pad <kbd>.</kbd></td></tr>
       <tr><td>Show video/graphic 1–9</td><td colspan="2"><kbd>F1</kbd>–<kbd>F9</kbd> (<span class="mac">on a Mac keyboard hold <kbd>fn</kbd></span><span class="win">on many laptops hold <kbd>Fn</kbd></span>)</td></tr>
     </table>
+  </div>
+</section>
+
+<!-- ================= PHOTOS ================= -->
+<section class="page" id="page-photos">
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <h2>1 · Camera cards</h2>
+        <div id="phCards" class="col" style="gap:6px"></div>
+        <div class="row" style="margin-top:8px">
+          <button id="phFolder">Choose a folder…</button>
+          <label><input type="checkbox" id="phAuto"> Pick photos automatically when a card is plugged in</label>
+        </div>
+        <div id="phSources" class="col" style="gap:6px;margin-top:8px"></div>
+      </div>
+      <div class="panel">
+        <h2>2 · Picking</h2>
+        <div class="row" style="gap:14px;align-items:flex-end">
+          <div class="col"><label>How picky</label>
+            <select id="phPick"><option value="relaxed">Relaxed (more photos)</option><option value="normal">Normal</option><option value="strict">Strict (only the crispest)</option></select></div>
+          <div class="col"><label>Most photos per card</label><input type="number" id="phMax" min="0" step="10"></div>
+        </div>
+        <label style="display:block;margin-top:8px"><input type="checkbox" id="phBurst"> One photo per burst (the sharpest frame)</label>
+        <p class="hint">Checks every photo's focus and keeps the sharpest frame from each burst. Anything you starred on the camera is always included. Settings apply to the next card.</p>
+      </div>
+      <div class="panel">
+        <h2>3 · Show</h2>
+        <div class="row" style="gap:14px;align-items:flex-end">
+          <div class="col"><label>Show on</label>
+            <select id="phTarget"><option value="board">Scoreboard</option><option value="tv">TV</option><option value="both">Scoreboard and TV</option></select></div>
+          <div class="col" id="phTvCol"><label>TV screen</label><select id="phTv" style="min-width:220px"></select></div>
+        </div>
+        <div class="row" style="gap:14px;align-items:flex-end;margin-top:10px">
+          <div class="col"><label>Seconds per photo</label><input type="number" id="phSecs" min="1" max="60"></div>
+          <div class="col"><label>On the scoreboard</label>
+            <select id="phFit"><option value="fill">Fill the board (trim edges)</option><option value="fit">Whole photo (black bars)</option></select></div>
+        </div>
+        <div class="col" style="margin-top:10px"><label>Caption on the TV (optional)</label><input type="text" id="phCaption" placeholder="e.g. Melksham RFC 24 – 17 Frome · Photos: Joe McCann" style="width:100%"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="good big" id="phStart">▶ Start photos</button>
+          <button id="phPrev" title="Previous">◀</button>
+          <button id="phPause">❚❚ Pause</button>
+          <button id="phNext" title="Next">▶</button>
+          <button class="bad" id="phStop">■ Stop photos</button>
+        </div>
+        <p class="hint" id="phNow" style="font-size:13px"></p>
+        <p class="hint">On the scoreboard, <kbd>Esc</kbd> (or "Back to scores") stops the photos and goes back to the scores.</p>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <h2>Picked photos <span id="phCount"></span></h2>
+        <p class="hint" style="margin-top:0">Click a photo to leave it out of the slideshow (click again to put it back).</p>
+        <div id="phGrid"></div>
+        <div class="row" style="margin-top:10px"><div class="spacer"></div><button id="phClear">Clear all photos</button></div>
+      </div>
+    </div>
   </div>
 </section>
 </main>
@@ -602,6 +677,9 @@ const STAGE_CSS = `
 .ak-team{left:0;right:0;top:2%;height:13%;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:900;color:var(--tn);text-transform:uppercase;opacity:0;animation:akTeam var(--d) forwards}
 .ak-team img{position:static;height:100%}
 @keyframes akTeam{0%,48%{opacity:0;transform:translateY(-20px)}56%{opacity:1;transform:none}90%{opacity:1}97%,100%{opacity:0}}
+.sb-photos{position:absolute;inset:0;background:#000;z-index:7;overflow:hidden}
+.sb-photos img{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .8s}
+.sb-photos img.on{opacity:1}
 .sb-test{position:absolute;inset:0;display:none;border:1px solid #f00;
   background-image:linear-gradient(#0f04 1px,transparent 1px),linear-gradient(90deg,#0f04 1px,transparent 1px);background-size:50px 50px}
 .sb-test span{position:absolute;font:bold 14px Arial;color:#ff0;padding:3px}
@@ -816,7 +894,22 @@ class Stage {
     const fs=Math.min(H*0.24, (H*0.9)/(lines.length*1.12), fitPx(widest, W*0.92, 9999));
     this.over.textContent=lines.join('\n'); this.over.style.fontSize=fs+'px'; this.over.style.display='flex';
   }
+  showPhoto(url, fill){
+    if(!this.photoBox){
+      this.clearAll();
+      const b=this.doc.createElement('div'); b.className='sb-photos'; this.el.appendChild(b); this.photoBox=b;
+    }
+    const box=this.photoBox, img=this.doc.createElement('img');
+    img.style.objectFit = fill ? 'cover' : 'contain';
+    img.src=url;
+    box.appendChild(img);
+    const reveal=()=>{ if(this.photoBox!==box) return; img.classList.add('on');
+      [...box.children].forEach(o=>{ if(o!==img) setTimeout(()=>o.remove(), 900); }); };
+    img.decode ? img.decode().then(reveal, reveal) : (img.onload=reveal);
+  }
+  hidePhotos(){ if(this.photoBox){ this.photoBox.remove(); this.photoBox=null; } }
   clearAll(){
+    this.hidePhotos();
     if(this.animEl){ this.animEl.remove(); this.animEl=null; }
     if(this.mediaEl){ try{ this.mediaEl.pause&&this.mediaEl.pause(); }catch(e){} this.mediaEl.remove(); this.mediaEl=null; }
     this.media.style.display='none'; this.over.style.display='none';
@@ -851,7 +944,8 @@ const DEFAULT = {
   settings:{w:400,h:270,x:0,y:0,bg:'#000000',bgImageId:null,font:'Arial Black',scoreCol:'#6dff9e',clockCol:'#7fd8ff',msgCol:'#ffffff',
             showClock:true,mirror:true,bgStyle:'teams',test:false,autoAnim:true,kickAnim:true,loop:false,flash:true,standbyStyle:'matchup',standbyText:'',standbyImageId:null,standbyOnStart:true,
             halfLen:40,binMins:10,kickoff:'',beep:false,
-            sponsorsOn:false,sponsorSecs:15,reelGap:10,reelImg:8,autoReel:false,displayId:'auto',globalKeys:false}
+            sponsorsOn:false,sponsorSecs:15,reelGap:10,reelImg:8,autoReel:false,displayId:'auto',globalKeys:false,
+            phAuto:true,phPick:'normal',phBurst:true,phMax:150,phTarget:'board',phTv:'auto',phSecs:6,phFit:'fill',phCaption:''}
 };
 let state = load();
 function load(){
@@ -1262,6 +1356,7 @@ function badgeImage(t){
 }
 let liveRun=0;
 function playLive(kind, side){
+  photosBoardOff();
   stopReel(); stopMusic(150);
   const t=teamFor(side);
   const master=document.createElement('canvas'); master.width=800; master.height=540;
@@ -1417,9 +1512,14 @@ function checkOutput(){
    SHOWING VIDEOS, GRAPHICS, MESSAGES & THE REEL
    ===================================================================== */
 let current=null;   // {type:'media'|'message', item, loop, el, text}
+// post-match photos live in photos.js; these stay safe if it hasn't loaded
+function photosBoardOff(){ if(window.PHOTOS) window.PHOTOS.boardOff(); }
+function photosOnBoard(){ return !!(window.PHOTOS && window.PHOTOS.onBoard()); }
+function photosPosition(){ return window.PHOTOS ? window.PHOTOS.position() : ''; }
 let reel=null;      // {i, timer}
 function playMedia(item, loop, fromReel){
   if(!item) return;
+  photosBoardOff();
   liveRun++; stopMusic(150);
   if(!fromReel) stopReel();
   const master = outOpen() ? outStage : previewStage;
@@ -1431,6 +1531,7 @@ function playMedia(item, loop, fromReel){
 }
 function showMessage(text){
   text=String(text||'').trim(); if(!text) return;
+  photosBoardOff();
   stopReel();
   for(const s of stages()) s.showMessage(text);
   current={type:'message',text}; updateNP();
@@ -1440,6 +1541,7 @@ function endCurrent(){
   else backToScores(false);
 }
 function setStandby(on){
+  if(on) photosBoardOff();
   state.standby=!!on; save();
   if(on){ stopReel(); for(const s of stages()) s.clearAll(); current=null; updateNP(); }
   for(const s of stages()) s.renderStandby(true);
@@ -1450,6 +1552,7 @@ function updateStandbyBtn(){
   document.querySelectorAll('.selStandby').forEach(sel=>sel.value=S_().standbyStyle);
 }
 function backToScores(user=true){
+  photosBoardOff();
   if(user!==false){ stopReel(); if(state.standby) setStandby(false); }
   stopMusic(user!==false ? 400 : 150);
   for(const s of stages()) s.clearAll();
@@ -1470,7 +1573,8 @@ function stopReel(){ if(reel){ clearTimeout(reel.timer); reel=null; updateNP(); 
 function toggleReel(){ if(reel) backToScores(); else startReel(); }
 function updateNP(){
   let t;
-  if(!current) t='Showing: <b>Scoreboard</b>'+(reel?' <span class="hint">(reel – next item in a moment)</span>':'');
+  if(!current && photosOnBoard()) t='Showing: <b>Photos</b> '+photosPosition();
+  else if(!current) t='Showing: <b>Scoreboard</b>'+(reel?' <span class="hint">(reel – next item in a moment)</span>':'');
   else if(current.type==='anim') t=`Showing: <b>${esc(current.name)}</b>`;
   else if(current.type==='message') t=`Showing message: <b>${esc(current.text.replace(/\n/g,' / '))}</b>`;
   else t=`Showing: <b>${esc(current.item.name)}</b> ${current.item.kind==='video'?(current.loop?'(looping video)':'(video)'):'(graphic)'}${reel?' <span class="hint">– reel playing</span>':''}`;
@@ -2000,5 +2104,6 @@ async function initApp(){
     if(i.target) reopenOutput(); else { if(outOpen()){ try{outWin.close();}catch(e){} dropOutput(); } toast('No scoreboard connected'); } };
 }
 </script>
+<script src="photos.js"></script>
 </body>
 </html>

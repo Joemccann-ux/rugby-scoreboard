@@ -34,8 +34,20 @@ The clubs that appear in the Home/Away dropdowns live in the `clubs` folder.
 3. Click **Commit changes**. New apps appear under Releases about 10 minutes later.
 
 
+## Post-match photos
+The **📷 Photos** tab shows your photos on the scoreboard, a TV, or both, straight after the game.
+
+1. Plug the camera card into the laptop. The app checks the focus of every photo and keeps the sharpest
+   frame from each burst (anything starred on the camera is always included). A card of about 2,500 photos
+   takes a few minutes; the progress bar shows how long is left.
+2. Click a photo to leave it out. Choose **Show on: Scoreboard / TV / Scoreboard and TV**, then **Start photos**.
+3. **Esc** (or Back to scores) takes the scoreboard back to the scores. Nothing on the card is changed.
+
+Works with JPEG and Nikon RAW (NEF) files, on Mac and Windows.
+
 ## Files
 - `app/index.html` – the scoreboard and control screens
+- `app/photos.js` – post-match photos (card reading, focus picking, slideshow)
 - `main.js` – desktop app: finds the scoreboard screen and puts the picture on it
 - `clubs/` – club list and badges, built into the app
 - `.github/workflows/build.yml` – builds the Mac and Windows apps

@@ -12,4 +12,11 @@ contextBridge.exposeInMainWorld('sbApi', {
   openDownload:(u)  => ipcRenderer.invoke('open-download', u),
   onDisplays:  (cb) => ipcRenderer.on('displays-changed', (_e, info) => cb(info)),
   onGlobalKey: (cb) => ipcRenderer.on('global-key', (_e, code) => cb(code)),
+  // post-match photos
+  photoCards:  ()   => ipcRenderer.invoke('photo-cards'),
+  photoFolder: ()   => ipcRenderer.invoke('photo-choose-folder'),
+  photoList:   (root) => ipcRenderer.invoke('photo-list', root),
+  photoRead:   (p, off, len) => ipcRenderer.invoke('photo-read', p, off, len),
+  setTvTarget: (id) => ipcRenderer.invoke('set-tv-target', id),
+  onCards:     (cb) => ipcRenderer.on('cards-changed', (_e, info) => cb(info)),
 });

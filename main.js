@@ -10,6 +10,8 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 
 let control = null;
 let output = null;
+let tvWin = null;
+let tvTargetId = 'auto';
 let targetId = 'auto';
 let practice = false;
 let quitting = false;
@@ -57,6 +59,89 @@ function placeOutput(win) {
     if (process.platform === 'darwin') win.setSimpleFullScreen(true); // instant, hides the menu bar, no new Space
     else win.setFullScreen(true);
   }, 150);
+}
+
+// TV for the post-match photo slideshow: the chosen screen, or any screen that is neither the laptop nor the scoreboard
+function tvDisplay() {
+  const all = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  if (tvTargetId !== 'auto') {
+    const chosen = all.find(d => String(d.id) === String(tvTargetId));
+    if (chosen) return chosen;
+  }
+  const board = scoreboardDisplay();
+  return all.find(d => d.id !== primary.id && (!board || d.id !== board.id)) || null;
+}
+function placeFull(win, d) {
+  if (!d) { win.setBounds({ width: 960, height: 560 }); win.center(); return; }
+  win.setBounds(d.bounds);
+  setTimeout(() => {
+    if (win.isDestroyed()) return;
+    win.setBounds(d.bounds);
+    if (process.platform === 'darwin') win.setSimpleFullScreen(true); else win.setFullScreen(true);
+  }, 150);
+}
+
+// ---------- photos from camera cards ----------
+const PHOTO_EXT = /\.(jpe?g|nef)$/i;
+const allowedRoots = new Set();
+function cardRoots() {
+  const out = [];
+  const add = (name, root, volume) => {
+    try { if (fs.statSync(root).isDirectory()) { out.push({ name, root, volume }); allowedRoots.add(path.resolve(root)); } } catch (e) {}
+  };
+  if (process.platform === 'darwin') {
+    let vols = [];
+    try { vols = fs.readdirSync('/Volumes'); } catch (e) {}
+    for (const v of vols) add(v, path.join('/Volumes', v, 'DCIM'), path.join('/Volumes', v));
+  } else if (process.platform === 'win32') {
+    for (const L of 'DEFGHIJKLMNOPQRSTUVWXYZ') add(`Card (${L}:)`, `${L}:\\DCIM`, `${L}:\\`);
+  } else {
+    for (const base of ['/media', '/run/media']) {
+      let users = [];
+      try { users = fs.readdirSync(base); } catch (e) {}
+      for (const u of users) {
+        let vols = [];
+        try { vols = fs.readdirSync(path.join(base, u)); } catch (e) {}
+        for (const v of vols) add(v, path.join(base, u, v, 'DCIM'), path.join(base, u, v));
+      }
+    }
+  }
+  return out;
+}
+function allowedPath(p) {
+  const r = path.resolve(String(p));
+  for (const a of allowedRoots) if (r === a || r.startsWith(a + path.sep)) return true;
+  return false;
+}
+async function listPhotos(root) {
+  const out = [];
+  const walk = async (dir, depth) => {
+    if (depth > 6) return;
+    let ents = [];
+    try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch (e) { return; }
+    for (const e of ents) {
+      if (e.name.startsWith('.')) continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(p, depth + 1);
+      else if (PHOTO_EXT.test(e.name)) {
+        try { const st = await fs.promises.stat(p); out.push({ path: p, size: st.size, mtime: st.mtimeMs }); } catch (err) {}
+      }
+    }
+  };
+  await walk(root, 0);
+  return out;
+}
+let lastCards = '';
+function watchCards() {
+  const cards = cardRoots();
+  const sig = cards.map(c => c.root).join('|');
+  if (sig !== lastCards) {
+    const before = new Set(lastCards ? lastCards.split('|') : []);
+    const added = lastCards === '' ? [] : cards.filter(c => !before.has(c.root));   // nothing counts as "new" at start-up
+    lastCards = sig || ' ';
+    if (control && !control.isDestroyed()) control.webContents.send('cards-changed', { cards, added });
+  }
 }
 
 // ---------- clubs ----------
@@ -130,10 +215,28 @@ function createControl() {
         },
       };
     }
+    if (frameName && frameName.startsWith('rugbySB_tv')) {
+      const d = tvDisplay();
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          ...(d ? { x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height } : { width: 960, height: 560 }),
+          frame: !d, title: 'Photos on TV', backgroundColor: '#000000', autoHideMenuBar: true,
+          fullscreenable: true, show: true,
+          webPreferences: { backgroundThrottling: false },
+        },
+      };
+    }
     if (url && /^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
   control.webContents.on('did-create-window', (win, details) => {
+    if (details.frameName && details.frameName.startsWith('rugbySB_tv')) {
+      tvWin = win;
+      placeFull(win, tvDisplay());
+      win.on('closed', () => { if (tvWin === win) tvWin = null; });
+      return;
+    }
     if (!details.frameName || !details.frameName.startsWith('rugbySB_output')) return;
     output = win;
     placeOutput(win);
@@ -149,7 +252,12 @@ function createControl() {
     if (choice !== 0) { e.preventDefault(); return; }
     quitting = true;
   });
-  control.on('closed', () => { control = null; if (output && !output.isDestroyed()) output.close(); app.quit(); });
+  control.on('closed', () => {
+    control = null;
+    if (output && !output.isDestroyed()) output.close();
+    if (tvWin && !tvWin.isDestroyed()) tvWin.close();
+    app.quit();
+  });
 }
 
 // ---------- IPC ----------
@@ -164,6 +272,30 @@ ipcMain.handle('asset', (_e, folder, file) => {
   return fs.existsSync(f) ? fs.readFileSync(f) : null;
 });
 ipcMain.handle('global-keys', (_e, on) => setGlobalKeys(!!on));
+// photos
+ipcMain.handle('photo-cards', () => { const c = cardRoots(); lastCards = c.map(x => x.root).join('|') || ' '; return c; });
+ipcMain.handle('photo-choose-folder', async () => {
+  const r = await dialog.showOpenDialog(control, { properties: ['openDirectory'], title: 'Choose a folder of photos (or a card)' });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const root = path.resolve(r.filePaths[0]);
+  allowedRoots.add(root);
+  return { name: path.basename(root), root, volume: null };
+});
+ipcMain.handle('photo-list', async (_e, root) => {
+  if (!allowedPath(root)) throw new Error('not allowed');
+  return listPhotos(path.resolve(root));
+});
+ipcMain.handle('photo-read', async (_e, p, off, len) => {
+  if (!allowedPath(p)) throw new Error('not allowed');
+  const fh = await fs.promises.open(path.resolve(p), 'r');
+  try {
+    const n = Math.max(0, Math.min(Number(len) || 0, 64 * 1024 * 1024));
+    const buf = Buffer.alloc(n);
+    const { bytesRead } = await fh.read(buf, 0, n, Math.max(0, Number(off) || 0));
+    return buf.subarray(0, bytesRead);
+  } finally { await fh.close(); }
+});
+ipcMain.handle('set-tv-target', (_e, id) => { tvTargetId = id || 'auto'; const d = tvDisplay(); return d ? d.id : null; });
 const REPO = 'Joemccann-ux/rugby-scoreboard';
 function currentBuild() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'app', 'build.json'), 'utf8')).build || 0; } catch (e) { return 0; }
@@ -196,6 +328,7 @@ app.whenReady().then(() => {
   screen.on('display-added', changed);
   screen.on('display-removed', changed);
   screen.on('display-metrics-changed', sendDisplays);
+  setInterval(watchCards, 2500);   // notice camera cards being plugged in
 });
 app.on('second-instance', () => { if (control) { if (control.isMinimized()) control.restore(); control.focus(); } });
 app.on('before-quit', () => { quitting = true; });
