@@ -490,6 +490,7 @@
       <tr><td>Play / stop the reel</td><td colspan="2">pad <kbd>+</kbd></td></tr>
       <tr><td>Show / hide standby screen</td><td colspan="2"><kbd>B</kbd> or pad <kbd>−</kbd></td></tr>
       <tr><td>Stop post-match photos on the scoreboard</td><td colspan="2"><kbd>Esc</kbd> or pad <kbd>.</kbd></td></tr>
+      <tr><td>Put the newest camera photo on the scoreboard (when "show it here first" is chosen)</td><td colspan="2"><kbd>L</kbd></td></tr>
       <tr><td>Show video/graphic 1–9</td><td colspan="2"><kbd>F1</kbd>–<kbd>F9</kbd> (<span class="mac">on a Mac keyboard hold <kbd>fn</kbd></span><span class="win">on many laptops hold <kbd>Fn</kbd></span>)</td></tr>
     </table>
   </div>
@@ -497,6 +498,25 @@
 
 <!-- ================= PHOTOS ================= -->
 <section class="page" id="page-photos">
+  <div class="panel">
+    <h2>📡 Live photos from the camera</h2>
+    <div class="row" style="gap:14px;align-items:flex-end">
+      <label style="font-size:14px;color:var(--text)"><input type="checkbox" id="liveOn"> <b>Receive photos from the camera</b></label>
+      <div class="col"><label>When a photo arrives</label>
+        <select id="liveMode">
+          <option value="auto">Put it on the scoreboard straight away</option>
+          <option value="approve">Show it here first – I click to put it up</option>
+          <option value="list">Just add it to the photos below</option>
+        </select></div>
+      <div class="col"><label>Seconds on the board</label><input type="number" id="liveSecs" min="2" max="60"></div>
+      <span id="liveStatus" class="pill">Off</span>
+    </div>
+    <div id="livePending" class="row" style="margin-top:10px;gap:10px"></div>
+    <details id="liveHelp" style="margin-top:10px">
+      <summary style="cursor:pointer;color:var(--mute)">Camera settings (Nikon Z9 – "Connect to FTP server")</summary>
+      <div id="liveSetup" class="hint" style="font-size:13px;line-height:1.6;color:var(--text);margin-top:8px"></div>
+    </details>
+  </div>
   <div class="grid">
     <div>
       <div class="panel">
@@ -945,7 +965,8 @@ const DEFAULT = {
             showClock:true,mirror:true,bgStyle:'teams',test:false,autoAnim:true,kickAnim:true,loop:false,flash:true,standbyStyle:'matchup',standbyText:'',standbyImageId:null,standbyOnStart:true,
             halfLen:40,binMins:10,kickoff:'',beep:false,
             sponsorsOn:false,sponsorSecs:15,reelGap:10,reelImg:8,autoReel:false,displayId:'auto',globalKeys:false,
-            phAuto:true,phPick:'normal',phBurst:true,phMax:150,phTarget:'board',phTv:'auto',phSecs:6,phFit:'fill',phCaption:''}
+            phAuto:true,phPick:'normal',phBurst:true,phMax:150,phTarget:'board',phTv:'auto',phSecs:6,phFit:'fill',phCaption:'',
+            liveOn:false,liveMode:'auto',liveSecs:8,livePort:2121,liveUser:'scoreboard',livePass:''}
 };
 let state = load();
 function load(){
@@ -1513,7 +1534,7 @@ function checkOutput(){
    ===================================================================== */
 let current=null;   // {type:'media'|'message', item, loop, el, text}
 // post-match photos live in photos.js; these stay safe if it hasn't loaded
-function photosBoardOff(){ if(window.PHOTOS) window.PHOTOS.boardOff(); }
+function photosBoardOff(clearQueue){ if(window.PHOTOS) window.PHOTOS.boardOff(!!clearQueue); }
 function photosOnBoard(){ return !!(window.PHOTOS && window.PHOTOS.onBoard()); }
 function photosPosition(){ return window.PHOTOS ? window.PHOTOS.position() : ''; }
 let reel=null;      // {i, timer}
@@ -1552,7 +1573,7 @@ function updateStandbyBtn(){
   document.querySelectorAll('.selStandby').forEach(sel=>sel.value=S_().standbyStyle);
 }
 function backToScores(user=true){
-  photosBoardOff();
+  photosBoardOff(user!==false);   // Esc / Back to scores also drops waiting camera photos; an animation ending doesn't
   if(user!==false){ stopReel(); if(state.standby) setStandby(false); }
   stopMusic(user!==false ? 400 : 150);
   for(const s of stages()) s.clearAll();

@@ -18,7 +18,7 @@
   "build": {
     "appId": "com.wiltshirepublications.rugbyscoreboard",
     "productName": "Rugby Scoreboard",
-    "files": ["main.js", "preload.js", "app/**/*"],
+    "files": ["main.js", "preload.js", "ftp.js", "app/**/*"],
     "extraResources": [{ "from": "clubs", "to": "clubs" }],
     "mac": {
       "icon": "build/icon.icns",

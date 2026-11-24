@@ -19,4 +19,10 @@ contextBridge.exposeInMainWorld('sbApi', {
   photoRead:   (p, off, len) => ipcRenderer.invoke('photo-read', p, off, len),
   setTvTarget: (id) => ipcRenderer.invoke('set-tv-target', id),
   onCards:     (cb) => ipcRenderer.on('cards-changed', (_e, info) => cb(info)),
+  // live photos from the camera
+  liveStart:   (o)  => ipcRenderer.invoke('live-start', o),
+  liveStop:    ()   => ipcRenderer.invoke('live-stop'),
+  liveInfo:    ()   => ipcRenderer.invoke('live-info'),
+  onLivePhoto: (cb) => ipcRenderer.on('live-photo', (_e, x) => cb(x)),
+  onLiveEvent: (cb) => ipcRenderer.on('live-event', (_e, x) => cb(x)),
 });

@@ -45,9 +45,18 @@ The **📷 Photos** tab shows your photos on the scoreboard, a TV, or both, stra
 
 Works with JPEG and Nikon RAW (NEF) files, on Mac and Windows.
 
+### Live photos from the camera (e.g. a try, seconds after it's scored)
+Tick **Receive photos from the camera** at the top of the 📷 Photos tab. The app becomes an FTP receiver, and the
+camera's built-in **Connect to FTP server** sends photos straight to it, over a network cable or Wi-Fi via a small
+router (e.g. GL.iNet Opal) and, for roaming the touchline, a pitch-side outdoor access point. The exact camera settings
+(address, port, user name, password) are shown in the app. Each photo goes on the scoreboard for a few seconds (after
+any try animation finishes), or waits on the laptop until you press **L** – your choice. They're also added to the
+end-of-match slideshow.
+
 ## Files
 - `app/index.html` – the scoreboard and control screens
-- `app/photos.js` – post-match photos (card reading, focus picking, slideshow)
+- `app/photos.js` – post-match photos (card reading, focus picking, slideshow) and live camera photos
+- `ftp.js` – the small FTP receiver the camera sends live photos to
 - `main.js` – desktop app: finds the scoreboard screen and puts the picture on it
 - `clubs/` – club list and badges, built into the app
 - `.github/workflows/build.yml` – builds the Mac and Windows apps

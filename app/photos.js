@@ -398,7 +398,8 @@ function stop(){
   renderShow();
   if(typeof updateNP==='function') updateNP();
 }
-function boardOff(){                // something else went on the scoreboard (Esc, a video, a try…)
+function boardOff(clearQueue){      // something else went on the scoreboard (Esc, a video, a try…)
+  liveOff(clearQueue);
   const sh=PH.show; if(!sh || !sh.board) return;
   sh.board=false;
   for(const s of stages()) s.hidePhotos();
@@ -495,6 +496,17 @@ function init(){
   $('phCards').onclick=e=>{ const b=e.target.closest('[data-card]'); if(b) scan(PH.cards[+b.dataset.card]); };
   $('tabPhotos').addEventListener('click', renderTvScreens);
   renderCards(); renderShow(); renderTvScreens();
+  // live photos
+  bind('liveMode','liveMode'); bind('liveSecs','liveSecs',1);
+  $('liveOn').checked=!!S_().liveOn;
+  $('liveOn').onchange=e=>{ S_().liveOn=e.target.checked; save(); e.target.checked ? startLive() : stopLive(); };
+  $('livePending').onclick=e=>{ const u=e.target.closest('[data-up]'), k=e.target.closest('[data-skip]');
+    if(u) putUp(LIVE.pending[+u.dataset.up]);
+    if(k){ LIVE.pending.splice(+k.dataset.skip,1); renderLive(); } };
+  if(typeof KEYMAP!=='undefined') KEYMAP.KeyL=()=>{ if(LIVE.pending.length) putUp(LIVE.pending[0]); else toast('No new camera photo waiting'); };
+  if(API_){ API_.onLivePhoto(onLivePhoto); API_.onLiveEvent(liveEvent); if(S_().liveOn) startLive(); }
+  setInterval(renderLive, 5000);
+  renderLive();
   if(API_){
     API_.photoCards().then(c=>{ PH.cards=c||[]; renderCards(); }).catch(()=>{});
     API_.onCards(({cards, added})=>{
@@ -510,10 +522,110 @@ function init(){
   setInterval(()=>{ const sh=PH.show; if(sh && sh.tv && (!PH.tvWin || PH.tvWin.closed)){ sh.tv=false; PH.tvWin=null; if(!sh.board) stop(); else renderShow(); } }, 1000);
 }
 
+/* ---------- live photos from the camera ---------- */
+const LIVE={queue:[], pending:[], showing:null, timer:null, running:false, info:null, lastAt:0, count:0};
+function boardBusy(){
+  return !!current || (typeof reel!=='undefined' && !!reel) || !!(PH.show && PH.show.board);
+}
+function showLiveNow(it){
+  LIVE.showing=it;
+  const fill=(S_().phFit||'fill')==='fill';
+  for(const s of stages()) s.showPhoto(it.url, fill);
+  clearTimeout(LIVE.timer);
+  LIVE.timer=setTimeout(()=>{ endLive(); }, Math.max(2, +S_().liveSecs||8)*1000);
+  if(typeof updateNP==='function') updateNP();
+  renderLive();
+}
+function tryShowLive(){
+  if(LIVE.showing || !LIVE.queue.length) return;
+  if(boardBusy()){ clearTimeout(LIVE.wait); LIVE.wait=setTimeout(tryShowLive, 500); return; }   // wait for a try animation etc. to finish
+  showLiveNow(LIVE.queue.shift());
+}
+function endLive(){
+  clearTimeout(LIVE.timer);
+  if(LIVE.showing){ for(const s of stages()) s.hidePhotos(); LIVE.showing=null; if(typeof updateNP==='function') updateNP(); }
+  renderLive();
+  tryShowLive();
+}
+function liveOff(clearQueue){
+  if(clearQueue){ LIVE.queue=[]; clearTimeout(LIVE.wait); }
+  if(LIVE.showing){ clearTimeout(LIVE.timer); LIVE.showing=null; for(const s of stages()) s.hidePhotos(); renderLive(); }
+}
+function putUp(it){                  // from the "show it here first" list or the L key
+  LIVE.pending=LIVE.pending.filter(x=>x!==it);
+  if(boardBusy() && !LIVE.showing){ LIVE.queue.push(it); tryShowLive(); }
+  else { if(LIVE.showing) endLive(); showLiveNow(it); }
+  renderLive();
+}
+async function onLivePhoto(x){
+  try{
+    const f={path:x.path, size:x.size||0, mtime:Date.now()};
+    if(!f.size) return;
+    const bytes=await readBytes(f, 0, f.size);
+    const r=await work({op:'display', buf:buf(bytes), orient:1, fromImage:true});
+    const t=new Date(), p=n=>String(n).padStart(2,'0');
+    const key=`${t.getFullYear()}:${p(t.getMonth()+1)}:${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}.000 ${x.name}`;
+    const it={id:'live|'+x.path+'|'+x.size+'|'+t.getTime(), key, name:x.name, url:URL.createObjectURL(r.main), thumb:URL.createObjectURL(r.thumb), off:false, live:true};
+    PH.items.push(it); addThumb(it); renderCount();      // also part of the end-of-match slideshow
+    LIVE.lastAt=Date.now(); LIVE.count++;
+    const mode=S_().liveMode||'auto';
+    if(mode==='auto'){ LIVE.queue.push(it); tryShowLive(); }
+    else if(mode==='approve'){ LIVE.pending.unshift(it); LIVE.pending=LIVE.pending.slice(0,8); toast('📡 New photo from the camera – press L to put it up'); }
+    else toast('📡 New photo from the camera');
+    renderLive();
+  }catch(e){ console.warn('live photo', e); toast('A photo arrived but couldn\'t be read'); }
+}
+function liveEvent(ev){
+  if(ev.type==='login'){ LIVE.connected=true; }
+  if(ev.type==='disconnect'){ LIVE.connected=false; }
+  if(ev.type==='badlogin') toast('📡 The camera tried to connect with the wrong user name or password');
+  if(ev.type==='notjpeg') toast(`📡 ${ev.name} isn't a JPEG – set the camera to upload JPEG only`);
+  renderLive();
+}
+async function startLive(){
+  if(!API_) return;
+  const S=S_();
+  if(!S.livePass){ S.livePass=String(1000+Math.floor(Math.random()*9000)); save(); }
+  const r=await API_.liveStart({port:S.livePort, user:S.liveUser, pass:S.livePass});
+  LIVE.running=!!r.ok; LIVE.info=r;
+  if(!r.ok){ toast('Couldn\'t start the photo receiver: '+r.error); S.liveOn=false; save(); $('liveOn').checked=false; }
+  renderLive();
+}
+async function stopLive(){ if(API_) await API_.liveStop(); LIVE.running=false; LIVE.info=null; renderLive(); }
+function renderLive(){
+  const st=$('liveStatus'); if(!st) return;
+  const S=S_();
+  if(!API_){ st.textContent='Desktop app only'; st.className='pill'; return; }
+  if(!LIVE.running){ st.textContent='Off'; st.className='pill'; }
+  else if(LIVE.showing){ st.textContent='On the board now'; st.className='pill ok'; }
+  else {
+    const ago=LIVE.lastAt ? Math.round((Date.now()-LIVE.lastAt)/1000) : null;
+    st.textContent = (LIVE.connected?'Camera connected':'Waiting for the camera') + (LIVE.count?` · ${LIVE.count} received`+(ago!=null&&ago<600?` (last ${ago<60?ago+'s':Math.round(ago/60)+' min'} ago)`:''):'');
+    st.className='pill ok';
+  }
+  const pend=$('livePending');
+  pend.innerHTML = LIVE.pending.map((it,i)=>`<div style="display:flex;flex-direction:column;gap:4px;align-items:center">
+      <img src="${it.thumb}" style="height:90px;border-radius:6px;background:#000">
+      <div class="row" style="gap:4px"><button class="good" data-up="${i}">Put up${i===0?' <kbd>L</kbd>':''}</button><button data-skip="${i}">Skip</button></div></div>`).join('');
+  const setup=$('liveSetup');
+  const addrs=(LIVE.info&&LIVE.info.addresses)||[];
+  const addrTxt = addrs.length ? addrs.map(a=>`<b>${esc(a.address)}</b> <span class="hint">(${esc(a.name)})</span>`).join(' or ') : '<i>no network yet – plug in the router cable</i>';
+  setup.innerHTML = LIVE.running ? `
+    <p style="margin:0 0 6px">Set these once on the camera: <b>Network menu → Connect to FTP server → Network settings → Create profile</b>.</p>
+    <ol style="margin:0;padding-left:18px">
+      <li>Choose <b>Wired LAN</b> (cable) or <b>Wireless</b> (router / pitch-side Wi-Fi), then <b>FTP</b> (plain FTP, not SFTP/FTPS).</li>
+      <li>Server address: ${addrTxt} &nbsp;·&nbsp; Port: <b>${esc(String(LIVE.info.port))}</b> &nbsp;·&nbsp; PASV mode: <b>On</b></li>
+      <li>Log in with User ID <b>${esc(S.liveUser)}</b> and password <b>${esc(S.livePass)}</b> (not anonymous). Folder: <b>home folder</b>.</li>
+      <li>In <b>Options</b>: <b>Upload RAW + JPEG as → JPEG only</b>. Leave <b>Auto upload Off</b> and send the shot you want with <b>i → Select for priority upload</b> (or turn Auto upload On to send every shot).</li>
+    </ol>
+    <p style="margin:6px 0 0">Tip: in the router's settings give this laptop a reserved address so it never changes. The first time, your computer may ask whether Rugby Scoreboard can accept incoming connections – click <b>Allow</b>.</p>`
+    : 'Tick "Receive photos from the camera" to see the settings to put into the camera.';
+}
+
 window.PHOTOS = {
   boardOff,
-  onBoard: ()=>!!(PH.show && PH.show.board),
-  position: ()=>PH.show ? (PH.show.pos||'') : '',
+  onBoard: ()=>!!(PH.show && PH.show.board) || !!LIVE.showing,
+  position: ()=>LIVE.showing ? '(live from the camera)' : (PH.show ? (PH.show.pos||'') : ''),
 };
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

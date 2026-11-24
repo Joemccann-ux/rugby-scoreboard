@@ -5,6 +5,7 @@
 const { app, BrowserWindow, screen, ipcMain, powerSaveBlocker, globalShortcut, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { CameraFtp, localAddresses } = require('./ftp');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); }
 
@@ -295,6 +296,29 @@ ipcMain.handle('photo-read', async (_e, p, off, len) => {
     return buf.subarray(0, bytesRead);
   } finally { await fh.close(); }
 });
+// live photos straight from the camera (camera's FTP upload → this app)
+let liveFtp = null;
+const liveFolder = () => path.join(app.getPath('pictures'), 'Rugby Scoreboard live photos');
+function sendControl(ch, x) { if (control && !control.isDestroyed()) control.webContents.send(ch, x); }
+ipcMain.handle('live-start', async (_e, o) => {
+  if (liveFtp) { liveFtp.stop(); liveFtp = null; }
+  const folder = liveFolder();
+  allowedRoots.add(path.resolve(folder));
+  const ftp = new CameraFtp({
+    port: parseInt(o && o.port, 10) || 2121, user: (o && o.user) || 'scoreboard', pass: (o && o.pass) || '', folder,
+    onFile: f => {
+      let size = 0; try { size = fs.statSync(f).size; } catch (e) {}
+      if (/\.jpe?g$/i.test(f)) sendControl('live-photo', { path: f, size, name: path.basename(f) });
+      else sendControl('live-event', { type: 'notjpeg', name: path.basename(f) });
+    },
+    onEvent: ev => sendControl('live-event', ev),
+  });
+  try { await ftp.start(); } catch (e) { return { ok: false, error: e.code === 'EADDRINUSE' ? `Port ${ftp.port} is already in use – choose another port.` : String(e.message || e) }; }
+  liveFtp = ftp;
+  return { ok: true, port: ftp.port, addresses: localAddresses(), folder };
+});
+ipcMain.handle('live-stop', () => { if (liveFtp) { liveFtp.stop(); liveFtp = null; } return true; });
+ipcMain.handle('live-info', () => ({ running: !!liveFtp, port: liveFtp ? liveFtp.port : null, addresses: localAddresses() }));
 ipcMain.handle('set-tv-target', (_e, id) => { tvTargetId = id || 'auto'; const d = tvDisplay(); return d ? d.id : null; });
 const REPO = 'Joemccann-ux/rugby-scoreboard';
 function currentBuild() {
